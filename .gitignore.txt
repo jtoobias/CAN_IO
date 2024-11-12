@@ -1,0 +1,31 @@
+# STM32CubeMX generated files
+Drivers/
+Startup/
+MX/
+
+# Build artifacts
+Build/
+Debug/
+Release/
+*.elf
+*.hex
+*.bin
+*.map
+
+# STM32CubeMX configuration file
+*.ioc
+
+# IDE-specific files and folders
+.settings/
+.vscode/
+.metadata/
+*.launch
+*.user
+*.dep
+*.cproject
+*.project
+
+# Temporary files
+*.swp
+*.log
+*.bak
