@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "hardware.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -40,10 +40,10 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-CAN_HandleTypeDef hcan;
 
 /* USER CODE BEGIN PV */
 
+uint8_t tx_data_buffer[8];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -57,18 +57,9 @@ static void MX_CAN_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-CAN_TxHeaderTypeDef tx_header;
-CAN_RxHeaderTypeDef rx_header;
-
-uint32_t tx_mail_box;
-uint8_t tx_data_buffer[8];
-uint8_t rx_data_buffer[8];
 
 uint8_t count = 0;
 
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan){
-	HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rx_header, rx_data_buffer);
-}
 /* USER CODE END 0 */
 
 /**
@@ -101,19 +92,20 @@ int main(void)
   MX_GPIO_Init();
   MX_CAN_Init();
   /* USER CODE BEGIN 2 */
-  HAL_CAN_Start(&hcan);
-  HAL_CAN_ActivateNotification(&hcan,CAN_IT_RX_FIFO0_MSG_PENDING);
+  	  // Initialize hardware variables such as CAN...
+  hardware_init();
 
-  tx_header.DLC = 1;
-  tx_header.ExtId = 0;
-  tx_header.IDE = CAN_ID_STD;
-  tx_header.RTR = CAN_RTR_DATA;
-  tx_header.StdId = 0x103;
-  tx_header.TransmitGlobalTime = DISABLE;
-
+//  tx_header.DLC = 1;
+//  tx_header.ExtId = 0;
+//  tx_header.IDE = CAN_ID_STD;
+//  tx_header.RTR = CAN_RTR_DATA;
+//  tx_header.StdId = 0x103;
+//  tx_header.TransmitGlobalTime = DISABLE;
+//
   tx_data_buffer[0] = 0xF3;
-
-  HAL_CAN_AddTxMessage(&hcan,&tx_header,tx_data_buffer,&tx_mail_box);
+//
+//  HAL_CAN_AddTxMessage(&hcan,&tx_header,tx_data_buffer,&tx_mail_box);
+  send_can_packet(0x100,&tx_data_buffer[0],1);
 
 
   /* USER CODE END 2 */
@@ -122,22 +114,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
-//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
-//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_SET);
-//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);
-//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
-//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);
-//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
-//	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);  // Toggle LED on PA5
-//	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_1);  // Toggle LED on PA5
-//	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_2);  // Toggle LED on PA5
-//	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_3);  // Toggle LED on PA5
-//	  HAL_Delay(1000);
-//	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_4);  // Toggle LED on PA5
-//	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);  // Toggle LED on PA5
-//	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);  // Toggle LED on PA5
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
 	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);  // Toggle LED on PA5
 	  HAL_Delay(1000);
     /* USER CODE END WHILE */
@@ -250,22 +227,22 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3
-                          |GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOA, OUT0_Pin|OUT1_Pin|OUT2_Pin|OUT3_Pin
+                          |OUT4_Pin|OUT5_Pin|OUT6_Pin|OUT7_Pin, GPIO_PIN_SET);
 
-  /*Configure GPIO pins : PA0 PA1 PA2 PA3
-                           PA4 PA5 PA6 PA7 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3
-                          |GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7;
+  /*Configure GPIO pins : OUT0_Pin OUT1_Pin OUT2_Pin OUT3_Pin
+                           OUT4_Pin OUT5_Pin OUT6_Pin OUT7_Pin */
+  GPIO_InitStruct.Pin = OUT0_Pin|OUT1_Pin|OUT2_Pin|OUT3_Pin
+                          |OUT4_Pin|OUT5_Pin|OUT6_Pin|OUT7_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB0 PB1 PB2 PB10
-                           PB11 PB12 PB13 PB14 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_10
-                          |GPIO_PIN_11|GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14;
+  /*Configure GPIO pins : IN0_Pin IN1_Pin IN2_Pin IN3_Pin
+                           IN4_Pin IN5_Pin IN6_Pin IN7_Pin */
+  GPIO_InitStruct.Pin = IN0_Pin|IN1_Pin|IN2_Pin|IN3_Pin
+                          |IN4_Pin|IN5_Pin|IN6_Pin|IN7_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
