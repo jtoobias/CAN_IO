@@ -43,7 +43,10 @@
 
 /* USER CODE BEGIN PV */
 
+
+CAN_HandleTypeDef hcan;
 uint8_t tx_data_buffer[8];
+unsigned int ms_timer = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -56,7 +59,6 @@ static void MX_CAN_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
 
 uint8_t count = 0;
 
@@ -95,6 +97,12 @@ int main(void)
   	  // Initialize hardware variables such as CAN...
   hardware_init();
 
+
+  setup_CAN_cfg(&hcan);
+
+  HAL_CAN_Start(&hcan);
+  HAL_CAN_ActivateNotification(&hcan,CAN_IT_RX_FIFO0_MSG_PENDING);
+
 //  tx_header.DLC = 1;
 //  tx_header.ExtId = 0;
 //  tx_header.IDE = CAN_ID_STD;
@@ -105,7 +113,6 @@ int main(void)
   tx_data_buffer[0] = 0xF3;
 //
 //  HAL_CAN_AddTxMessage(&hcan,&tx_header,tx_data_buffer,&tx_mail_box);
-  send_can_packet(0x100,&tx_data_buffer[0],1);
 
 
   /* USER CODE END 2 */
@@ -114,9 +121,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
-	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);  // Toggle LED on PA5
-	  HAL_Delay(1000);
+//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
+//	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);  // Toggle LED on PA5
+//	  hardware_monitoring();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -195,17 +202,17 @@ static void MX_CAN_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN CAN_Init 2 */
-  CAN_FilterTypeDef can_filter_config;
-  can_filter_config.FilterActivation = CAN_FILTER_ENABLE;
-  can_filter_config.FilterBank = 10;
-  can_filter_config.FilterFIFOAssignment = CAN_RX_FIFO0;
-  can_filter_config.FilterMaskIdHigh = 0;
-  can_filter_config.FilterIdLow = 0x0000;
-  can_filter_config.FilterMode = CAN_FILTERMODE_IDMASK;
-  can_filter_config.FilterScale = CAN_FILTERSCALE_32BIT;
-  can_filter_config.SlaveStartFilterBank = 0;
+//  CAN_FilterTypeDef can_filter_config;
+//  can_filter_config.FilterActivation = CAN_FILTER_ENABLE;
+//  can_filter_config.FilterBank = 10;
+//  can_filter_config.FilterFIFOAssignment = CAN_RX_FIFO0;
+//  can_filter_config.FilterMaskIdHigh = 0;
+//  can_filter_config.FilterIdLow = 0x0000;
+//  can_filter_config.FilterMode = CAN_FILTERMODE_IDMASK;
+//  can_filter_config.FilterScale = CAN_FILTERSCALE_32BIT;
+//  can_filter_config.SlaveStartFilterBank = 0;
 
-  HAL_CAN_ConfigFilter(&hcan,&can_filter_config);
+//  HAL_CAN_ConfigFilter(&hcan,&can_filter_config);
   /* USER CODE END CAN_Init 2 */
 
 }
@@ -227,8 +234,11 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, OUT0_Pin|OUT1_Pin|OUT2_Pin|OUT3_Pin
-                          |OUT4_Pin|OUT5_Pin|OUT6_Pin|OUT7_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(OUT0_GPIO_Port, OUT0_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, OUT1_Pin|OUT2_Pin|OUT3_Pin|OUT4_Pin
+                          |OUT5_Pin|OUT6_Pin|OUT7_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pins : OUT0_Pin OUT1_Pin OUT2_Pin OUT3_Pin
                            OUT4_Pin OUT5_Pin OUT6_Pin OUT7_Pin */
@@ -243,7 +253,7 @@ static void MX_GPIO_Init(void)
                            IN4_Pin IN5_Pin IN6_Pin IN7_Pin */
   GPIO_InitStruct.Pin = IN0_Pin|IN1_Pin|IN2_Pin|IN3_Pin
                           |IN4_Pin|IN5_Pin|IN6_Pin|IN7_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
@@ -258,6 +268,11 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+// INTERRUPTS
+void HAL_SYSTICK_Callback(void) {
+    // Increment a software timer or set a flag for deferred processing
+	ms_timer++;
+}
 
 /* USER CODE END 4 */
 
