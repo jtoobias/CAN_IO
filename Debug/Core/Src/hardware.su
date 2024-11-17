@@ -1,9 +1,9 @@
 ../Core/Src/hardware.c:15:6:hardware_init	4	static
-../Core/Src/hardware.c:20:6:hardware_monitoring	4	static
-../Core/Src/hardware.c:24:6:setup_CAN_cfg	16	static
-../Core/Src/hardware.c:45:6:send_can_packet	32	static
-../Core/Src/hardware.c:60:6:set_outputs	8	static
-../Core/Src/hardware.c:85:6:read_input	8	static
-../Core/Src/hardware.c:106:6:sdo_handler	96	static,ignoring_inline_asm
-../Core/Src/hardware.c:178:6:HAL_CAN_RxFifo0MsgPendingCallback	24	static
-../Core/Src/hardware.c:210:6:HAL_GPIO_EXTI_Callback	16	static
+../Core/Src/hardware.c:20:6:hardware_monitoring	8	static
+../Core/Src/hardware.c:26:6:setup_CAN_cfg	16	static
+../Core/Src/hardware.c:47:6:send_can_packet	32	static
+../Core/Src/hardware.c:62:6:set_outputs	8	static
+../Core/Src/hardware.c:87:6:read_inputs	8	static
+../Core/Src/hardware.c:99:6:sdo_handler	96	static,ignoring_inline_asm
+../Core/Src/hardware.c:173:6:HAL_CAN_RxFifo0MsgPendingCallback	24	static
+../Core/Src/hardware.c:211:6:HAL_GPIO_EXTI_Callback	16	static

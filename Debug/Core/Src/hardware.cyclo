@@ -1,9 +1,9 @@
 ../Core/Src/hardware.c:15:6:hardware_init	1
 ../Core/Src/hardware.c:20:6:hardware_monitoring	1
-../Core/Src/hardware.c:24:6:setup_CAN_cfg	1
-../Core/Src/hardware.c:45:6:send_can_packet	2
-../Core/Src/hardware.c:60:6:set_outputs	9
-../Core/Src/hardware.c:85:6:read_input	1
-../Core/Src/hardware.c:106:6:sdo_handler	6
-../Core/Src/hardware.c:178:6:HAL_CAN_RxFifo0MsgPendingCallback	9
-../Core/Src/hardware.c:210:6:HAL_GPIO_EXTI_Callback	1
+../Core/Src/hardware.c:26:6:setup_CAN_cfg	1
+../Core/Src/hardware.c:47:6:send_can_packet	2
+../Core/Src/hardware.c:62:6:set_outputs	9
+../Core/Src/hardware.c:87:6:read_inputs	1
+../Core/Src/hardware.c:99:6:sdo_handler	6
+../Core/Src/hardware.c:173:6:HAL_CAN_RxFifo0MsgPendingCallback	11
+../Core/Src/hardware.c:211:6:HAL_GPIO_EXTI_Callback	1

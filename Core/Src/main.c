@@ -40,6 +40,7 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+CAN_HandleTypeDef hcan;
 
 /* USER CODE BEGIN PV */
 
@@ -110,8 +111,14 @@ int main(void)
 //  tx_header.StdId = 0x103;
 //  tx_header.TransmitGlobalTime = DISABLE;
 //
-  tx_data_buffer[0] = 0xF3;
-//
+  hardware.can.tx_header.DLC = 1;
+  hardware.can.tx_header.StdId = hardware.can.id_u.id_value;
+  hardware.can.tx_header.ExtId = 0;
+  hardware.can.tx_header.IDE = CAN_ID_STD;
+  hardware.can.tx_header.RTR = CAN_RTR_DATA;
+  hardware.can.tx_header.TransmitGlobalTime = DISABLE;
+  hardware.can.tx_data_buffer[0] = 0xF3;
+  hardware_monitoring();
 //  HAL_CAN_AddTxMessage(&hcan,&tx_header,tx_data_buffer,&tx_mail_box);
 
 
@@ -124,6 +131,8 @@ int main(void)
 //	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
 //	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);  // Toggle LED on PA5
 //	  hardware_monitoring();
+	  HAL_Delay(1000);
+//	  HAL_CAN_AddTxMessage(&hcan,&hardware.can.tx_header,hardware.can.tx_data_buffer,&hardware.can.tx_mail_box);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -187,7 +196,7 @@ static void MX_CAN_Init(void)
   /* USER CODE END CAN_Init 1 */
   hcan.Instance = CAN1;
   hcan.Init.Prescaler = 18;
-  hcan.Init.Mode = CAN_MODE_LOOPBACK;
+  hcan.Init.Mode = CAN_MODE_NORMAL;
   hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
   hcan.Init.TimeSeg1 = CAN_BS1_2TQ;
   hcan.Init.TimeSeg2 = CAN_BS2_1TQ;

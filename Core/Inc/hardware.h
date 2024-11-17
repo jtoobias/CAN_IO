@@ -153,5 +153,5 @@ void hardware_monitoring(void);
 void setup_CAN_cfg(CAN_HandleTypeDef *hcan);
 void send_can_packet(CAN_HandleTypeDef *hcan,int func_code,int8_t *data,int data_len);
 void set_outputs(void);
-void read_input(void);
+void read_inputs(void);
 #endif /* INC_HARDWARE_H_ */

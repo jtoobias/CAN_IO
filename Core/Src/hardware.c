@@ -18,6 +18,8 @@ void hardware_init(void){
 
 // Used to poll hardware
 void hardware_monitoring(void){
+	read_inputs();
+
 }
 
 // Functions
@@ -48,7 +50,7 @@ void send_can_packet(CAN_HandleTypeDef *hcan,int func_code,int8_t *data,int data
 	  hardware.can.tx_header.ExtId = 0;
 	  hardware.can.tx_header.IDE = CAN_ID_STD;
 	  hardware.can.tx_header.RTR = CAN_RTR_DATA;
-	  hardware.can.tx_header.StdId = func_code << 7 | hardware.can.id_u.id_value;
+	  hardware.can.tx_header.StdId = func_code | hardware.can.id_u.id_value;
 	  hardware.can.tx_header.TransmitGlobalTime = DISABLE;
 	  for (int i = 0; i < data_len; i++){
 		  hardware.can.tx_data_buffer[i] = *(data + i);
@@ -82,7 +84,7 @@ void set_outputs(void){
 	if (hardware.out_u.output.bit7)HAL_GPIO_WritePin(OUT7_GPIO_Port, OUT7_Pin, GPIO_PIN_SET);
 	else HAL_GPIO_WritePin(OUT7_GPIO_Port, OUT7_Pin, GPIO_PIN_RESET);
 }
-void read_input(void){
+void read_inputs(void){
 	// Read inputs
     hardware.in_u.input.bit0 = (HAL_GPIO_ReadPin(IN0_GPIO_Port, IN0_Pin) != GPIO_PIN_SET);
     hardware.in_u.input.bit1 = (HAL_GPIO_ReadPin(IN1_GPIO_Port, IN1_Pin) != GPIO_PIN_SET);
@@ -96,10 +98,12 @@ void read_input(void){
 
 void sdo_handler(CAN_HandleTypeDef *hcan, int8_t *packet,int len){
 	int cmd = *packet;
+	int tmp_debug = *(packet+1);
+	int tmp_debug1 = *(packet+2);
 		// Go from little-edian to big
-	int16_t index = __REV16(*(int16_t*)(packet+1));
-	int8_t sub_index = (packet+3);
-	int data = *(int32_t*)(packet+(8-len));
+	int16_t index = (*(int16_t*)(packet+1));
+	int8_t sub_index = *(packet+3);
+	int data = *(int32_t*)(packet+4);
 
 	int8_t response[8];
 	int response_len = 0;
@@ -114,13 +118,13 @@ void sdo_handler(CAN_HandleTypeDef *hcan, int8_t *packet,int len){
 				*(int16_t*)&response[1] = __REV16(index);
 				response[3] = OUTPUT_SUBINDEX_OD;
 				response[4] = hardware.out_u.output_value;
-				response_len = 1;
+				response_len = 5;
 				break;
 			default:
 				response[0] = CAN_SERVER_RESPONSE_ERROR;
 				*(int16_t*)&response[1] = __REV16(index);
 				response[3] = sub_index;
-				response_len = 0;
+				response_len = 4;
 				printf("[ERROR] CAN Write index not found %d",index);
 				break;
 		}
@@ -132,14 +136,14 @@ void sdo_handler(CAN_HandleTypeDef *hcan, int8_t *packet,int len){
 				*(int16_t*)&response[1] = __REV16(index);
 				response[3] = OUTPUT_SUBINDEX_OD;
 				response[4] = hardware.out_u.output_value;
-				response_len = 1;
+				response_len = 5;
 				break;
 			case INPUT_INDEX_OD:
 				response[0] = RD_SERVER_RESPONSE_CMD_1_BYTE;
 				*(int16_t*)&response[1] = __REV16(index);
 				response[3] = INPUT_SUBINDEX_OD;
 				response[4] = hardware.in_u.input_value;
-				response_len = 1;
+				response_len = 5;
 				send_can_packet(hcan,TSDO,response,response_len);
 				break;
 
@@ -147,7 +151,7 @@ void sdo_handler(CAN_HandleTypeDef *hcan, int8_t *packet,int len){
 				response[0] = CAN_SERVER_RESPONSE_ERROR;
 				*(int16_t*)&response[1] = __REV16(index);
 				response[3] = sub_index;
-				response_len = 0;
+				response_len = 4;
 				printf("[ERROR] CAN Read index not found %d",index);
 				break;
 		}
@@ -156,7 +160,7 @@ void sdo_handler(CAN_HandleTypeDef *hcan, int8_t *packet,int len){
 		response[0] = CAN_SERVER_RESPONSE_ERROR;
 		*(int16_t*)&response[1] = 0x0000;
 		response[3] = 0x00;
-		response_len = 0;
+		response_len = 4;
 		// No a known command
 		printf("[ERROR] CAN CMD not found %d",cmd);
 	}
@@ -170,8 +174,10 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan){
 
     if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &hardware.can.rx_header, hardware.can.rx_data_buffer) == HAL_OK) {
         // Process the received message
+    	int can_id = (hardware.can.rx_header.StdId & 0x07F);
+    	if (can_id != hardware.can.id_u.id_value) return;
     		// Check COB-ID
-    	int cob_id = (hardware.can.rx_header.StdId & 0x78) >> 3;
+    	int cob_id = (hardware.can.rx_header.StdId & 0x780);
 //    	hardware.can.rx_header.DLC
     	switch (cob_id){
 			case RPDO1:
@@ -191,7 +197,11 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan){
 				break;
 
     		case RSDO:
+    			sdo_handler(hcan, &hardware.can.rx_data_buffer,hardware.can.rx_header.DLC);
+    			break;
 
+    		default:
+    			printf("[ERROR] Unknown COB-ID %d",cob_id);
     			break;
     	}
     }
