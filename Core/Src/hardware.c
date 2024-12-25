@@ -23,18 +23,32 @@ void hardware_monitoring(void){
 }
 
 // Functions
+  // Call before starting CAN
 void setup_CAN_cfg(CAN_HandleTypeDef *hcan){
 
 	// Read inputs
     hardware.can.id_u.id.bit0 = (HAL_GPIO_ReadPin(CAN_CFG1_GPIO_Port, CAN_CFG1_Pin) == GPIO_PIN_SET);
     hardware.can.id_u.id.bit1 = (HAL_GPIO_ReadPin(CAN_CFG2_GPIO_Port, CAN_CFG2_Pin) == GPIO_PIN_SET);
     hardware.can.id_u.id.bit2 = (HAL_GPIO_ReadPin(CAN_CFG3_GPIO_Port, CAN_CFG3_Pin) == GPIO_PIN_SET);
+    hardware.can.id_u.id.bit3 = (HAL_GPIO_ReadPin(CAN_CFG4_GPIO_Port, CAN_CFG4_Pin) == GPIO_PIN_SET);
+
+    hardware.can.buad_u.buad.bit0 = (HAL_GPIO_ReadPin(CAN_Baud1_GPIO_Port, CAN_Baud1_Pin) == GPIO_PIN_SET);
+    hardware.can.buad_u.buad.bit1 = (HAL_GPIO_ReadPin(CAN_Baud2_GPIO_Port, CAN_Baud2_Pin) == GPIO_PIN_SET);
+    hardware.can.buad_u.buad.bit2 = (HAL_GPIO_ReadPin(CAN_Baud3_GPIO_Port, CAN_Baud3_Pin) == GPIO_PIN_SET);
+
+	// 0 is eeprom value, 1 = 125 kbps, 2 = 250 kbps, 3=500 kbps, 4 = 1 kbps, higher defaults to 500 kbps
+	if (hardware.can.buad_u.value == 0);
+	else if (hardware.can.buad_u.value == 1) hcan->Init.Prescaler = CAN_BUAD_RATE_PRESCALER_125;
+	else if (hardware.can.buad_u.value == 2) hcan->Init.Prescaler = CAN_BUAD_RATE_PRESCALER_250;
+	else if (hardware.can.buad_u.value == 3) hcan->Init.Prescaler = CAN_BUAD_RATE_PRESCALER_500;
+	else if (hardware.can.buad_u.value == 4) hcan->Init.Prescaler = CAN_BUAD_RATE_PRESCALER_1000;
+	else hcan->Init.Prescaler = CAN_BUAD_RATE_PRESCALER_500;
 
     hardware.can.filter.FilterIdHigh = 0x00;
     hardware.can.filter.FilterIdLow = hardware.can.id_u.id_value;
     hardware.can.filter.FilterMaskIdHigh = 0x00;
     hardware.can.filter.FilterMaskIdLow = hardware.can.id_u.id_value;
-    hardware.can.filter.FilterFIFOAssignment = CAN_RX_FIFO0;
+    hardware.can.filter.FilterFIFOAssignment = CAN_RX_FIFO1;
     hardware.can.filter.FilterBank = 0;
     hardware.can.filter.FilterMode = CAN_FILTERMODE_IDMASK;
     hardware.can.filter.FilterScale = CAN_FILTERSCALE_16BIT;
@@ -125,7 +139,7 @@ void sdo_handler(CAN_HandleTypeDef *hcan, int8_t *packet,int len){
 				*(int16_t*)&response[1] = __REV16(index);
 				response[3] = sub_index;
 				response_len = 4;
-				printf("[ERROR] CAN Write index not found %d",index);
+//				sprintf("[ERROR] CAN Write index not found %d",index);
 				break;
 		}
 	} else if (cmd & RD_CLIENT_REQUEST_CMD_BYTE){
@@ -152,7 +166,7 @@ void sdo_handler(CAN_HandleTypeDef *hcan, int8_t *packet,int len){
 				*(int16_t*)&response[1] = __REV16(index);
 				response[3] = sub_index;
 				response_len = 4;
-				printf("[ERROR] CAN Read index not found %d",index);
+//				printf("[ERROR] CAN Read index not found %d",index);
 				break;
 		}
 
@@ -162,17 +176,16 @@ void sdo_handler(CAN_HandleTypeDef *hcan, int8_t *packet,int len){
 		response[3] = 0x00;
 		response_len = 4;
 		// No a known command
-		printf("[ERROR] CAN CMD not found %d",cmd);
+//		printf("[ERROR] CAN CMD not found %d",cmd);
 	}
 
 	send_can_packet(hcan,TSDO,response,response_len);
 }
 
-
 //	Manage CAN messages here, build packet handler
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan){
+void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan){
 
-    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &hardware.can.rx_header, hardware.can.rx_data_buffer) == HAL_OK) {
+    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO1, &hardware.can.rx_header, hardware.can.rx_data_buffer) == HAL_OK) {
         // Process the received message
     	int can_id = (hardware.can.rx_header.StdId & 0x07F);
     	if (can_id != hardware.can.id_u.id_value) return;
@@ -212,3 +225,20 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	read_inputs();
 }
+
+//void USB_LP_CAN1_RX0_IRQHandler(void)
+//{
+//    HAL_PCD_IRQHandler(&hpcd_USB_FS);
+//}
+
+//uint8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
+//{
+//    // `Buf` contains the incoming data
+//    // `Len` contains the length of the data
+//    // Process the incoming data
+//
+//    // Example: echo data back to the host
+//    CDC_Transmit_FS(Buf, *Len);
+//
+//    return USBD_OK;
+//}

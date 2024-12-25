@@ -18,10 +18,13 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "hardware.h"
+#include "usbd_cdc_if.h"
+#include "string.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -31,22 +34,49 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define ICM4670_WHOAMI_REG		0x75
+#define ICM4670_PWRMGMT0_REG	0x1F
+
+#define ICM4670_ACCEL_DATA_X1	0x0B
+#define ICM4670_ACCEL_DATA_X0	0x0C
+#define ICM4670_ACCEL_DATA_Y1	0x0D
+#define ICM4670_ACCEL_DATA_Y0	0x0E
+#define ICM4670_ACCEL_DATA_Z1	0x0F
+#define ICM4670_ACCEL_DATA_Z0	0x10
+
+#define ICM4670_GYRO_DATA_X1	0x11
+#define ICM4670_GYRO_DATA_X0	0x12
+#define ICM4670_GYRO_DATA_Y1	0x13
+#define ICM4670_GYRO_DATA_Y0	0x14
+#define ICM4670_GYRO_DATA_Z1	0x15
+#define ICM4670_GYRO_DATA_Z0	0x16
+
+
+#define ICM4670_GYRO_CONFIG0	0x20
+#define ICM4670_ACCEL_CONFIG0	0x21
+#define ICM4670_GYRO_CONFIG1	0x23
+#define ICM4670_ACCEL_CONFIG1	0x24
 
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
+uint8_t ICM4670_read_reg (uint8_t addr, uint8_t* read_data);
+uint8_t ICM4670_write_reg (uint8_t addr, uint8_t write_data);
+int32_t ICM4670_get_temperature (void);
+
+uint8_t ICM4670_get_accel_data (int16_t* accel_data);
+uint8_t ICM4670_get_gyro_data (int16_t* gyro_data);
 
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 CAN_HandleTypeDef hcan;
 
+SPI_HandleTypeDef hspi1;
+
 /* USER CODE BEGIN PV */
 
-
-CAN_HandleTypeDef hcan;
-uint8_t tx_data_buffer[8];
 unsigned int ms_timer = 0;
 /* USER CODE END PV */
 
@@ -54,6 +84,7 @@ unsigned int ms_timer = 0;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_CAN_Init(void);
+static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -61,7 +92,13 @@ static void MX_CAN_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+// Debug used for USB testing
+char tx_data_buffer[8];
+uint8_t rx_data_buffer[2] = {0,0};
+int16_t accel_data_buffer[3] = {0,0,0};
+int16_t gyro_data_buffer[3] = {0,0,0};
 uint8_t count = 0;
+int32_t temp = 0;
 
 /* USER CODE END 0 */
 
@@ -94,45 +131,53 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_CAN_Init();
+  MX_SPI1_Init();
+  MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
   	  // Initialize hardware variables such as CAN...
   hardware_init();
-
-
   setup_CAN_cfg(&hcan);
 
   HAL_CAN_Start(&hcan);
-  HAL_CAN_ActivateNotification(&hcan,CAN_IT_RX_FIFO0_MSG_PENDING);
+  HAL_CAN_ActivateNotification(&hcan,CAN_IT_RX_FIFO1_MSG_PENDING);
 
-//  tx_header.DLC = 1;
-//  tx_header.ExtId = 0;
-//  tx_header.IDE = CAN_ID_STD;
-//  tx_header.RTR = CAN_RTR_DATA;
-//  tx_header.StdId = 0x103;
-//  tx_header.TransmitGlobalTime = DISABLE;
-//
-  hardware.can.tx_header.DLC = 1;
-  hardware.can.tx_header.StdId = hardware.can.id_u.id_value;
-  hardware.can.tx_header.ExtId = 0;
-  hardware.can.tx_header.IDE = CAN_ID_STD;
-  hardware.can.tx_header.RTR = CAN_RTR_DATA;
-  hardware.can.tx_header.TransmitGlobalTime = DISABLE;
-  hardware.can.tx_data_buffer[0] = 0xF3;
   hardware_monitoring();
-//  HAL_CAN_AddTxMessage(&hcan,&tx_header,tx_data_buffer,&tx_mail_box);
 
-
+//  Init for ICM4670
+  ICM4670_write_reg(ICM4670_PWRMGMT0_REG,0x0F);
+//   4+-g, 400 Hz
+  ICM4670_write_reg(ICM4670_ACCEL_CONFIG0,0x27);
+//  1000+-, 400 Hz
+  ICM4670_write_reg(ICM4670_GYRO_CONFIG0,0x27);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
-//	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);  // Toggle LED on PA5
-//	  hardware_monitoring();
-	  HAL_Delay(1000);
-//	  HAL_CAN_AddTxMessage(&hcan,&hardware.can.tx_header,hardware.can.tx_data_buffer,&hardware.can.tx_mail_box);
+
+	  uint8_t status = 0;
+//	  sprintf(tx_data_buffer,"%u\r\n",count);
+//	  count++;
+//	  if (count > 100) count = 0;
+//
+//	  CDC_Transmit_FS((uint8_t *) tx_data_buffer, strlen(tx_data_buffer));
+
+
+	  hardware.can.tx_header.DLC = 1;
+	  hardware.can.tx_header.ExtId = 0x00;
+	  hardware.can.tx_header.StdId = 0x103;
+	  hardware.can.tx_header.IDE = CAN_ID_STD;
+	  hardware.can.tx_header.RTR = CAN_RTR_DATA;
+	  hardware.can.tx_header.TransmitGlobalTime = DISABLE;
+	  tx_data_buffer[0] = 0xf5;
+
+	  HAL_CAN_AddTxMessage(&hcan,&hardware.can.tx_header,tx_data_buffer,&hardware.can.tx_mail_box);
+//	  status = ICM4670_read_reg(ICM4670_WHOAMI_REG,&rx_data_buffer);
+	  temp = ICM4670_get_temperature();
+	  status = ICM4670_get_accel_data(&accel_data_buffer);
+	  status = ICM4670_get_gyro_data(&gyro_data_buffer);
+	  HAL_Delay(100);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -148,6 +193,7 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
@@ -174,6 +220,12 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
+  PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLL_DIV1_5;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
   }
@@ -211,6 +263,7 @@ static void MX_CAN_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN CAN_Init 2 */
+
 //  CAN_FilterTypeDef can_filter_config;
 //  can_filter_config.FilterActivation = CAN_FILTER_ENABLE;
 //  can_filter_config.FilterBank = 10;
@@ -227,6 +280,44 @@ static void MX_CAN_Init(void)
 }
 
 /**
+  * @brief SPI1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI1_Init(void)
+{
+
+  /* USER CODE BEGIN SPI1_Init 0 */
+
+  /* USER CODE END SPI1_Init 0 */
+
+  /* USER CODE BEGIN SPI1_Init 1 */
+
+  /* USER CODE END SPI1_Init 1 */
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI1_Init 2 */
+
+  /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -238,21 +329,30 @@ static void MX_GPIO_Init(void)
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(OUT0_GPIO_Port, OUT0_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, OUT0_Pin|OUT1_Pin|OUT2_Pin|OUT3_Pin
+                          |OUT4_Pin|OUT5_Pin|OUT6_Pin|OUT7_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, OUT1_Pin|OUT2_Pin|OUT3_Pin|OUT4_Pin
-                          |OUT5_Pin|OUT6_Pin|OUT7_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pins : CAN_Baud1_Pin CAN_Baud2_Pin CAN_Baud3_Pin */
+  GPIO_InitStruct.Pin = CAN_Baud1_Pin|CAN_Baud2_Pin|CAN_Baud3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pins : OUT0_Pin OUT1_Pin OUT2_Pin OUT3_Pin
-                           OUT4_Pin OUT5_Pin OUT6_Pin OUT7_Pin */
+                           OUT4_Pin OUT5_Pin OUT6_Pin OUT7_Pin
+                           IMU_CS_Pin */
   GPIO_InitStruct.Pin = OUT0_Pin|OUT1_Pin|OUT2_Pin|OUT3_Pin
-                          |OUT4_Pin|OUT5_Pin|OUT6_Pin|OUT7_Pin;
+                          |OUT4_Pin|OUT5_Pin|OUT6_Pin|OUT7_Pin
+                          |IMU_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -266,8 +366,14 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : CAN_CFG1_Pin CAN_CFG2_Pin CAN_CFG3_Pin */
-  GPIO_InitStruct.Pin = CAN_CFG1_Pin|CAN_CFG2_Pin|CAN_CFG3_Pin;
+  /*Configure GPIO pins : CAN_CFG1_Pin IMU_INT_Pin */
+  GPIO_InitStruct.Pin = CAN_CFG1_Pin|IMU_INT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : CAN_CFG2_Pin CAN_CFG3_Pin CAN_CFG4_Pin */
+  GPIO_InitStruct.Pin = CAN_CFG2_Pin|CAN_CFG3_Pin|CAN_CFG4_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -281,6 +387,106 @@ static void MX_GPIO_Init(void)
 void HAL_SYSTICK_Callback(void) {
     // Increment a software timer or set a flag for deferred processing
 	ms_timer++;
+}
+
+
+// SPI configuration
+//SPI Operational Features
+//1. Data is delivered MSB first and LSB last
+//2. Data is latched on the rising edge of SCLK
+//3. Data should be transitioned on the falling edge of SCLK
+//4. The maximum frequency of SCLK is 24 MHz
+//5. SPI read and write operations are completed in 16 or more clock cycles (two or more bytes). The first
+//byte contains the Register Address, and the following byte(s) contain(s) the SPI data. The first bit of the
+//first byte contains the Read/Write bit and indicates the Read (1) operation. The following 7 bits contain
+//the Register Address. In cases of multiple-byte Reads, data is two or more bytes:
+
+
+uint8_t ICM4670_write_reg (uint8_t addr, uint8_t write_data){
+	uint8_t tx_buff[2] = {addr,write_data};
+	uint8_t rx_buff[2];
+
+	//Select IMU: CS pin low for IMU
+	HAL_GPIO_WritePin(IMU_CS_GPIO_Port,IMU_CS_Pin,GPIO_PIN_RESET);
+	// Read register
+	uint8_t status = (HAL_SPI_TransmitReceive(&hspi1,tx_buff,rx_buff,2,HAL_MAX_DELAY) == HAL_OK);
+	//Select IMU: CS pin low for IMU
+	HAL_GPIO_WritePin(IMU_CS_GPIO_Port,IMU_CS_Pin,GPIO_PIN_SET);
+
+	return status;
+}
+
+uint8_t ICM4670_read_reg (uint8_t addr, uint8_t* read_data){
+	uint8_t tx_buff[2] = {(0x80 | addr),0x00};
+	uint8_t rx_buff[2] = {0,0};
+
+	//Select IMU: CS pin low for IMU
+	HAL_GPIO_WritePin(IMU_CS_GPIO_Port,IMU_CS_Pin,GPIO_PIN_RESET);
+	// Read register
+	uint8_t status = (HAL_SPI_TransmitReceive(&hspi1,tx_buff,rx_buff,2,HAL_MAX_DELAY) == HAL_OK);
+	//Select IMU: CS pin low for IMU
+	HAL_GPIO_WritePin(IMU_CS_GPIO_Port,IMU_CS_Pin,GPIO_PIN_SET);
+
+		// Second byte has the data
+	*read_data = rx_buff[1];
+
+	return status;
+}
+
+
+int32_t ICM4670_get_temperature (void){
+	uint8_t tx_buff[3] = {(0x80 | 0x09),0,0};
+	uint8_t rx_buff[3] = {0};
+	int16_t tmp = 0;
+
+	//Select IMU: CS pin low for IMU
+	HAL_GPIO_WritePin(IMU_CS_GPIO_Port,IMU_CS_Pin,GPIO_PIN_RESET);
+	// Read register
+	uint8_t status = (HAL_SPI_TransmitReceive(&hspi1,tx_buff,rx_buff,sizeof(tx_buff),HAL_MAX_DELAY) == HAL_OK);
+	HAL_GPIO_WritePin(IMU_CS_GPIO_Port,IMU_CS_Pin,GPIO_PIN_SET);
+	tmp = (int16_t)(rx_buff[1] << 8 | rx_buff[2]);//Select IMU: CS pin low for IMU
+	//	• Temperature in Degrees Centigrade = (TEMP_DATA / 128) + 25
+	int32_t temperature = ((tmp*10)/128) + (25*10);
+	return temperature;
+}
+
+
+uint8_t ICM4670_get_accel_data (int16_t* accel_data){
+
+	uint8_t tx_buff[7] = {(0x80 | ICM4670_ACCEL_DATA_X1),0,0,0,0,0,0};
+	uint8_t rx_buff[7] = {0};
+	uint8_t status = 0;
+	//Select IMU: CS pin low for IMU
+	HAL_GPIO_WritePin(IMU_CS_GPIO_Port,IMU_CS_Pin,GPIO_PIN_RESET);
+	// Read register
+	status = (HAL_SPI_TransmitReceive(&hspi1,tx_buff,rx_buff,sizeof(tx_buff),HAL_MAX_DELAY) == HAL_OK);
+	HAL_GPIO_WritePin(IMU_CS_GPIO_Port,IMU_CS_Pin,GPIO_PIN_SET);
+
+    // Combine high and low bytes for each axis
+    accel_data[0] = (int16_t)(rx_buff[1] << 8 | rx_buff[2]); // X-axis (X and Y mixed up)
+    accel_data[1] = (int16_t)(rx_buff[3] << 8 | rx_buff[4]); // Y-axis
+    accel_data[2] = (int16_t)(rx_buff[5] << 8 | rx_buff[6]); // Z-axis;
+
+	return status;
+}
+
+uint8_t ICM4670_get_gyro_data (int16_t* gyro_data){
+
+	uint8_t tx_buff[7] = {(0x80 | ICM4670_GYRO_DATA_X1),0,0,0,0,0,0};
+	uint8_t rx_buff[7] = {0};
+	uint8_t status = 0;
+	//Select IMU: CS pin low for IMU
+	HAL_GPIO_WritePin(IMU_CS_GPIO_Port,IMU_CS_Pin,GPIO_PIN_RESET);
+	// Read register
+	status = (HAL_SPI_TransmitReceive(&hspi1,tx_buff,rx_buff,sizeof(tx_buff),HAL_MAX_DELAY) == HAL_OK);
+	HAL_GPIO_WritePin(IMU_CS_GPIO_Port,IMU_CS_Pin,GPIO_PIN_SET);
+
+    // Combine high and low bytes for each axis
+	gyro_data[0] = (int16_t)(rx_buff[1] << 8 | rx_buff[2]); // X-axis (X and Y mixed up)
+	gyro_data[1] = (int16_t)(rx_buff[3] << 8 | rx_buff[4]); // Y-axis
+	gyro_data[2] = (int16_t)(rx_buff[5] << 8 | rx_buff[6]); // Z-axis
+	return status;
+
 }
 
 /* USER CODE END 4 */

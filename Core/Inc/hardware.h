@@ -73,8 +73,13 @@
 #define RD_SERVER_RESPONSE_CMD_3_BYTE	0x47
 #define RD_SERVER_RESPONSE_CMD_4_BYTE	0x43
 
-#define CAN_SERVER_RESPONSE_SUCCESS			0x60
-#define CAN_SERVER_RESPONSE_ERROR			0x80
+#define CAN_SERVER_RESPONSE_SUCCESS		0x60
+#define CAN_SERVER_RESPONSE_ERROR		0x80
+
+#define CAN_BUAD_RATE_PRESCALER_125		72
+#define CAN_BUAD_RATE_PRESCALER_250		36
+#define CAN_BUAD_RATE_PRESCALER_500		18
+#define CAN_BUAD_RATE_PRESCALER_1000	9
 
 //CMD determines the direction of data transfer and the size of the data object:
 //• 0x23 Sending of 4-byte data (bytes 5 - 8 contains a 32-bit value).
@@ -101,6 +106,21 @@ typedef struct{
 		}id;
 		uint8_t id_value;
 	}id_u;
+
+	union {
+		struct{
+			uint8_t bit0		:1;
+			uint8_t bit1		:1;
+			uint8_t bit2		:1;
+			uint8_t bit3		:1;
+			uint8_t bit4		:1;
+			uint8_t bit5		:1;
+			uint8_t bit6		:1;
+			uint8_t bit7		:1;
+		}buad;
+		uint8_t value;
+	}buad_u;
+
 
 
 	CAN_TxHeaderTypeDef tx_header;
@@ -143,6 +163,7 @@ typedef struct{
 		uint8_t output_value;
 	}out_u;
 	can_t can;
+
 }hardware_t;
 
 // Declare the global instance of hardware_t

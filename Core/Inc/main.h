@@ -57,6 +57,12 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define CAN_Baud1_Pin GPIO_PIN_13
+#define CAN_Baud1_GPIO_Port GPIOC
+#define CAN_Baud2_Pin GPIO_PIN_14
+#define CAN_Baud2_GPIO_Port GPIOC
+#define CAN_Baud3_Pin GPIO_PIN_15
+#define CAN_Baud3_GPIO_Port GPIOC
 #define OUT0_Pin GPIO_PIN_0
 #define OUT0_GPIO_Port GPIOA
 #define OUT1_Pin GPIO_PIN_1
@@ -89,12 +95,18 @@ void Error_Handler(void);
 #define IN6_GPIO_Port GPIOB
 #define IN7_Pin GPIO_PIN_14
 #define IN7_GPIO_Port GPIOB
-#define CAN_CFG1_Pin GPIO_PIN_8
-#define CAN_CFG1_GPIO_Port GPIOA
-#define CAN_CFG2_Pin GPIO_PIN_9
+#define CAN_CFG1_Pin GPIO_PIN_15
+#define CAN_CFG1_GPIO_Port GPIOB
+#define CAN_CFG2_Pin GPIO_PIN_8
 #define CAN_CFG2_GPIO_Port GPIOA
-#define CAN_CFG3_Pin GPIO_PIN_10
+#define CAN_CFG3_Pin GPIO_PIN_9
 #define CAN_CFG3_GPIO_Port GPIOA
+#define CAN_CFG4_Pin GPIO_PIN_10
+#define CAN_CFG4_GPIO_Port GPIOA
+#define IMU_CS_Pin GPIO_PIN_15
+#define IMU_CS_GPIO_Port GPIOA
+#define IMU_INT_Pin GPIO_PIN_6
+#define IMU_INT_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
