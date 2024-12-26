@@ -87,14 +87,19 @@ void Error_Handler(void);
 #define IN2_GPIO_Port GPIOB
 #define IN3_Pin GPIO_PIN_10
 #define IN3_GPIO_Port GPIOB
+#define IN3_EXTI_IRQn EXTI15_10_IRQn
 #define IN4_Pin GPIO_PIN_11
 #define IN4_GPIO_Port GPIOB
+#define IN4_EXTI_IRQn EXTI15_10_IRQn
 #define IN5_Pin GPIO_PIN_12
 #define IN5_GPIO_Port GPIOB
+#define IN5_EXTI_IRQn EXTI15_10_IRQn
 #define IN6_Pin GPIO_PIN_13
 #define IN6_GPIO_Port GPIOB
+#define IN6_EXTI_IRQn EXTI15_10_IRQn
 #define IN7_Pin GPIO_PIN_14
 #define IN7_GPIO_Port GPIOB
+#define IN7_EXTI_IRQn EXTI15_10_IRQn
 #define CAN_CFG1_Pin GPIO_PIN_15
 #define CAN_CFG1_GPIO_Port GPIOB
 #define CAN_CFG2_Pin GPIO_PIN_8
@@ -107,6 +112,7 @@ void Error_Handler(void);
 #define IMU_CS_GPIO_Port GPIOA
 #define IMU_INT_Pin GPIO_PIN_6
 #define IMU_INT_GPIO_Port GPIOB
+#define IMU_INT_EXTI_IRQn EXTI9_5_IRQn
 
 /* USER CODE BEGIN Private defines */
 

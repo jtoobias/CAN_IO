@@ -5,6 +5,7 @@
  *      Author: Jonathan
  */
 #include "hardware.h"
+#include "ICM42670P.h"
 // Variables
 // Define the global instance of hardware_t
 hardware_t hardware;
@@ -12,8 +13,9 @@ hardware_t hardware;
 // Functions
 
 // used to handle any hardware inits
-void hardware_init(void){
-
+void hardware_init(CAN_HandleTypeDef *can_handler){
+	//
+	hardware.can.handler = can_handler;
 }
 
 // Used to poll hardware
@@ -24,7 +26,7 @@ void hardware_monitoring(void){
 
 // Functions
   // Call before starting CAN
-void setup_CAN_cfg(CAN_HandleTypeDef *hcan){
+void setup_CAN_cfg(void){
 
 	// Read inputs
     hardware.can.id_u.id.bit0 = (HAL_GPIO_ReadPin(CAN_CFG1_GPIO_Port, CAN_CFG1_Pin) == GPIO_PIN_SET);
@@ -38,11 +40,11 @@ void setup_CAN_cfg(CAN_HandleTypeDef *hcan){
 
 	// 0 is eeprom value, 1 = 125 kbps, 2 = 250 kbps, 3=500 kbps, 4 = 1 kbps, higher defaults to 500 kbps
 	if (hardware.can.buad_u.value == 0);
-	else if (hardware.can.buad_u.value == 1) hcan->Init.Prescaler = CAN_BUAD_RATE_PRESCALER_125;
-	else if (hardware.can.buad_u.value == 2) hcan->Init.Prescaler = CAN_BUAD_RATE_PRESCALER_250;
-	else if (hardware.can.buad_u.value == 3) hcan->Init.Prescaler = CAN_BUAD_RATE_PRESCALER_500;
-	else if (hardware.can.buad_u.value == 4) hcan->Init.Prescaler = CAN_BUAD_RATE_PRESCALER_1000;
-	else hcan->Init.Prescaler = CAN_BUAD_RATE_PRESCALER_500;
+	else if (hardware.can.buad_u.value == 1) hardware.can.handler->Init.Prescaler = CAN_BUAD_RATE_PRESCALER_125;
+	else if (hardware.can.buad_u.value == 2) hardware.can.handler->Init.Prescaler = CAN_BUAD_RATE_PRESCALER_250;
+	else if (hardware.can.buad_u.value == 3) hardware.can.handler->Init.Prescaler = CAN_BUAD_RATE_PRESCALER_500;
+	else if (hardware.can.buad_u.value == 4) hardware.can.handler->Init.Prescaler = CAN_BUAD_RATE_PRESCALER_1000;
+	else hardware.can.handler->Init.Prescaler = CAN_BUAD_RATE_PRESCALER_500;
 
     hardware.can.filter.FilterIdHigh = 0x00;
     hardware.can.filter.FilterIdLow = hardware.can.id_u.id_value;
@@ -54,11 +56,11 @@ void setup_CAN_cfg(CAN_HandleTypeDef *hcan){
     hardware.can.filter.FilterScale = CAN_FILTERSCALE_16BIT;
     hardware.can.filter.FilterActivation = CAN_FILTER_ENABLE;
 //    hardware.can.filter.SlaveStartFilterBank = ; //    For single CAN instances, this parameter is meaningless.
-    HAL_CAN_ConfigFilter(hcan,&hardware.can.filter);
+    HAL_CAN_ConfigFilter(hardware.can.handler,&hardware.can.filter);
 
 }
 
-void send_can_packet(CAN_HandleTypeDef *hcan,int func_code,int8_t *data,int data_len){
+void send_can_packet(int func_code,uint8_t *data,uint32_t data_len){
 
 	  hardware.can.tx_header.DLC = data_len;
 	  hardware.can.tx_header.ExtId = 0;
@@ -69,7 +71,7 @@ void send_can_packet(CAN_HandleTypeDef *hcan,int func_code,int8_t *data,int data
 	  for (int i = 0; i < data_len; i++){
 		  hardware.can.tx_data_buffer[i] = *(data + i);
 	  }
-	  HAL_CAN_AddTxMessage(hcan,&hardware.can.tx_header,
+	  HAL_CAN_AddTxMessage(hardware.can.handler,&hardware.can.tx_header,
 			  hardware.can.tx_data_buffer,&hardware.can.tx_mail_box);
 }
 
@@ -110,17 +112,15 @@ void read_inputs(void){
     hardware.in_u.input.bit7 = (HAL_GPIO_ReadPin(IN7_GPIO_Port, IN7_Pin) != GPIO_PIN_SET);
 }
 
-void sdo_handler(CAN_HandleTypeDef *hcan, int8_t *packet,int len){
+void sdo_handler(uint8_t *packet,uint32_t len){
 	int cmd = *packet;
-	int tmp_debug = *(packet+1);
-	int tmp_debug1 = *(packet+2);
 		// Go from little-edian to big
 	int16_t index = (*(int16_t*)(packet+1));
 	int8_t sub_index = *(packet+3);
 	int data = *(int32_t*)(packet+4);
 
-	int8_t response[8];
-	int response_len = 0;
+	uint8_t response[8];
+	uint32_t response_len = 0;
 
 	if (cmd & 0x20){
 		// Use data length to get data out (set objects)
@@ -158,7 +158,7 @@ void sdo_handler(CAN_HandleTypeDef *hcan, int8_t *packet,int len){
 				response[3] = INPUT_SUBINDEX_OD;
 				response[4] = hardware.in_u.input_value;
 				response_len = 5;
-				send_can_packet(hcan,TSDO,response,response_len);
+				send_can_packet(TSDO,response,response_len);
 				break;
 
 			default:
@@ -179,13 +179,13 @@ void sdo_handler(CAN_HandleTypeDef *hcan, int8_t *packet,int len){
 //		printf("[ERROR] CAN CMD not found %d",cmd);
 	}
 
-	send_can_packet(hcan,TSDO,response,response_len);
+	send_can_packet(TSDO,response,response_len);
 }
 
 //	Manage CAN messages here, build packet handler
-void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan){
+void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *can_handler){
 
-    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO1, &hardware.can.rx_header, hardware.can.rx_data_buffer) == HAL_OK) {
+    if (HAL_CAN_GetRxMessage(can_handler, CAN_RX_FIFO1, &hardware.can.rx_header, hardware.can.rx_data_buffer) == HAL_OK) {
         // Process the received message
     	int can_id = (hardware.can.rx_header.StdId & 0x07F);
     	if (can_id != hardware.can.id_u.id_value) return;
@@ -210,20 +210,35 @@ void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan){
 				break;
 
     		case RSDO:
-    			sdo_handler(hcan, &hardware.can.rx_data_buffer,hardware.can.rx_header.DLC);
+    			sdo_handler(hardware.can.rx_data_buffer,hardware.can.rx_header.DLC);
     			break;
 
     		default:
-    			printf("[ERROR] Unknown COB-ID %d",cob_id);
+//    			printf("[ERROR] Unknown COB-ID %d",cob_id);
     			break;
     	}
     }
 }
-
 // This is used to override the weak HAL interrupt function
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	read_inputs();
+	if (GPIO_Pin == IMU_INT_Pin){
+		// Handler IMU interrupt
+		if (HAL_GPIO_ReadPin(IMU_INT_GPIO_Port, IMU_INT_Pin) == GPIO_PIN_SET){
+			// call read DMA function
+			ICM42670P_read_imu_DMA();
+		}
+	} else {
+		read_inputs();
+	}
+}
+
+// This is used to override the weak HAL interrupt function
+void HAL_SPI_TxRxCplt_Callback(SPI_HandleTypeDef *hspi)
+{
+	if (hspi->Instance == SPI1){
+		ICM42670P_read_imu_DMA_complete();
+	}
 }
 
 //void USB_LP_CAN1_RX0_IRQHandler(void)

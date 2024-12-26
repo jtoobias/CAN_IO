@@ -1,3 +1,4 @@
+"./Core/Src/ICM42670P.o"
 "./Core/Src/hardware.o"
 "./Core/Src/main.o"
 "./Core/Src/stm32f1xx_hal_msp.o"

@@ -123,6 +123,8 @@ typedef struct{
 
 
 
+	CAN_HandleTypeDef *handler;
+
 	CAN_TxHeaderTypeDef tx_header;
 	CAN_RxHeaderTypeDef rx_header;
 	CAN_FilterTypeDef	filter;
@@ -169,10 +171,11 @@ typedef struct{
 // Declare the global instance of hardware_t
 extern hardware_t hardware;
 //Functions
-void hardware_init(void);
+void hardware_init(CAN_HandleTypeDef *can_handler);
 void hardware_monitoring(void);
-void setup_CAN_cfg(CAN_HandleTypeDef *hcan);
-void send_can_packet(CAN_HandleTypeDef *hcan,int func_code,int8_t *data,int data_len);
+void setup_CAN_cfg(void);
+void send_can_packet(int func_code,uint8_t *data,uint32_t data_len);
 void set_outputs(void);
 void read_inputs(void);
+void sdo_handler(uint8_t *packet,uint32_t len);
 #endif /* INC_HARDWARE_H_ */
