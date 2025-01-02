@@ -3,10 +3,12 @@ This repo holds the firmware for a custom CAN input and output circuit board cen
 Completed:
 - Polling of IMU data is working, on new hardware (v1.0.0)
 - CAN bus is working on new hardware (v1.0.0)
+- Use DMA to get IMU data
+- RPDOs working
 
 ToDo:
-- Use DMA to get IMU data
 - Set CAN bus interface with computer for GUI instead of USB for now
+- NMT commands to go from idle -> pre-op -> operation , error -> idle
 - Handle PDOs - Periodic send, send on change, send on sync, Store PDO mapping in EEprom 
 - Need to send Unique ID
 - USB still not working due to hardware

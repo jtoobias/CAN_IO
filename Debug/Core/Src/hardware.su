@@ -7,4 +7,4 @@
 ../Core/Src/hardware.c:115:6:sdo_handler	80	static,ignoring_inline_asm
 ../Core/Src/hardware.c:186:6:HAL_CAN_RxFifo1MsgPendingCallback	24	static
 ../Core/Src/hardware.c:223:6:HAL_GPIO_EXTI_Callback	16	static
-../Core/Src/hardware.c:237:6:HAL_SPI_TxRxCplt_Callback	16	static
+../Core/Src/hardware.c:237:6:HAL_SPI_TxRxCpltCallback	16	static

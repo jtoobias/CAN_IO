@@ -143,8 +143,8 @@ int main(void)
 
 	  HAL_CAN_AddTxMessage(&hcan,&hardware.can.tx_header,tx_data_buffer,&hardware.can.tx_mail_box);
 //	  status = ICM42670_read_reg(ICM42670_WHOAMI_REG,&rx_data_buffer);
-	  ICM42670P_update_gyro_data();
-	  ICM42670P_update_accel_data();
+//	  ICM42670P_update_gyro_data();
+//	  ICM42670P_update_accel_data();
 	  HAL_Delay(100);
     /* USER CODE END WHILE */
 

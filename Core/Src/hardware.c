@@ -234,7 +234,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 }
 
 // This is used to override the weak HAL interrupt function
-void HAL_SPI_TxRxCplt_Callback(SPI_HandleTypeDef *hspi)
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 {
 	if (hspi->Instance == SPI1){
 		ICM42670P_read_imu_DMA_complete();

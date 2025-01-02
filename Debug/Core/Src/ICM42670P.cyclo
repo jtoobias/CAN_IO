@@ -1,0 +1,8 @@
+../Core/Src/ICM42670P.c:21:9:ICM42670P_init	1
+../Core/Src/ICM42670P.c:50:9:ICM42670P_write_reg	1
+../Core/Src/ICM42670P.c:64:9:ICM42670_read_reg	1
+../Core/Src/ICM42670P.c:81:9:ICM42670P_update_temperature	2
+../Core/Src/ICM42670P.c:98:9:ICM42670P_update_accel_data	1
+../Core/Src/ICM42670P.c:117:9:ICM42670P_update_gyro_data	1
+../Core/Src/ICM42670P.c:137:9:ICM42670P_read_imu_DMA	2
+../Core/Src/ICM42670P.c:156:6:ICM42670P_read_imu_DMA_complete	2

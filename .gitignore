@@ -22,8 +22,8 @@ Release/
 *.launch
 *.user
 *.dep
-*.cproject
-*.project
+#*.cproject
+#*.project
 
 # Temporary files
 *.swp
