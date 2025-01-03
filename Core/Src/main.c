@@ -52,7 +52,7 @@ DMA_HandleTypeDef hdma_spi1_tx;
 
 /* USER CODE BEGIN PV */
 
-unsigned int ms_timer = 0;
+volatile uint32_t ms_timer = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -115,6 +115,7 @@ int main(void)
   HAL_CAN_Start(&hcan);
   HAL_CAN_ActivateNotification(&hcan,CAN_IT_RX_FIFO1_MSG_PENDING);
 
+  hardware.last_can_state_check_time = ms_timer;
   hardware_monitoring();
   ICM42670P_init(&hspi1);
 
@@ -145,6 +146,11 @@ int main(void)
 //	  status = ICM42670_read_reg(ICM42670_WHOAMI_REG,&rx_data_buffer);
 //	  ICM42670P_update_gyro_data();
 //	  ICM42670P_update_accel_data();
+
+	  	  // Test this (TEST)
+	  if ((ms_timer - hardware.last_can_state_check_time) >= 200){
+		  can_state_manager(&hcan);
+	  }
 	  HAL_Delay(100);
     /* USER CODE END WHILE */
 

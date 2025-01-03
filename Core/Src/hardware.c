@@ -13,15 +13,22 @@ hardware_t hardware;
 // Functions
 
 // used to handle any hardware inits
-void hardware_init(CAN_HandleTypeDef *can_handler){
+void hardware_init(void){
 	//
 	hardware.can.handler = can_handler;
+	hardware.can.state = CAN_STATE_INIT;
 }
 
 // Used to poll hardware
 void hardware_monitoring(void){
 	read_inputs();
 
+}
+
+void reboot_device(void) {
+	// Make sure to perform any save before reset
+
+    NVIC_SystemReset(); // Triggers a system reset
 }
 
 // Functions
@@ -182,30 +189,125 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 	send_can_packet(TSDO,response,response_len);
 }
 
+
+void can_state_manager(CAN_HandleTypeDef *can_handler){
+// NODE CONNECTIONS
+// init -> preoperational
+// preoperational -> operational
+// Preoerational -> Stopped
+// Preoperational -> Init (two ways (reset, and comms reset)
+// Operational -> stopped
+// Operational -> preoperational
+// Operational -> Init (two ways (reset, and comms reset)
+
+	// Check current states and see requierd action to get to the next state
+	switch (hardware.can.state){
+		case CAN_STATE_INIT:
+			hardware.can.state = CAN_STATE_PREOPERATIONAL;
+			HAL_CAN_Stop(&can_handler);
+			setup_CAN_cfg();
+			HAL_CAN_Start(&can_handler);
+			break;
+		case CAN_STATE_PREOPERATIONAL:
+			if (hardware.can.target_state == CAN_STATE_OPERATIONAL) hardware.can.state == CAN_STATE_OPERATIONAL;
+		case CAN_STATE_OPERATIONAL:
+			if (hardware.can.target_state == CAN_STATE_PREOPERATIONAL &&
+				hardware.can.state == CAN_STATE_OPERATIONAL) {
+				hardware.can.state == CAN_STATE_PREOPERATIONAL;
+
+			} else if (hardware.can.target_state == CAN_STATE_INIT) {
+				hardware.can.state = CAN_STATE_INIT;
+			} else if (hardware.can.target_state == CAN_STATE_STOPPED) {
+				hardware.can.state = CAN_STATE_STOPPED;
+			}
+			break;
+		case CAN_STATE_STOPPED:
+			if (hardware.can.target_state == CAN_STATE_PREOPERATIONAL) {
+				hardware.can.state == CAN_STATE_PREOPERATIONAL;
+			} else if (hardware.can.target_state == CAN_STATE_OPERATIONAL) {
+				hardware.can.state = CAN_STATE_OPERATIONAL;
+			} else if (hardware.can.target_state == CAN_STATE_INIT) {
+				hardware.can.state = CAN_STATE_INIT;
+			}
+			break;
+		default:
+			//problem
+			break;
+	}
+}
+
+void nmt_handler(uint8_t *packet,uint32_t len){
+	// Handle device state
+		// make sure the nmt is for us
+	if (*(packet+1) != hardware.can.id_u.id_value) return;
+	uint8_t cmd = *packet;
+
+	// Actual transitions are handled in another state machine to make sure the correct steps are executed
+	switch (cmd){
+		case NMT_START:
+			hardware.can.target_state = CAN_STATE_OPERATIONAL;
+			break;
+		case NMT_STOP:
+			hardware.can.target_state = CAN_STATE_STOPPED;
+			break;
+		case NMT_PREOPERATIONAL:
+			hardware.can.target_state = CAN_STATE_PREOPERATIONAL;
+			break;
+		case NMT_RESET_NODE:
+			reboot_device();
+			break;
+		case NMT_RESET_COMMS:
+			// Call Can setup and update PDO's from eeprom
+			hardware.can.target_state = CAN_STATE_INIT;
+			break;
+	}
+}
+
+void sync_handler(void){
+	// Place holder for now
+
+}
+
 //	Manage CAN messages here, build packet handler
 void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *can_handler){
 
     if (HAL_CAN_GetRxMessage(can_handler, CAN_RX_FIFO1, &hardware.can.rx_header, hardware.can.rx_data_buffer) == HAL_OK) {
+    	if (hardware.can.state != CAN_STATE_PREOPERATIONAL ||
+    		hardware.can.state != CAN_STATE_OPERATIONAL) return;
         // Process the received message
     	int can_id = (hardware.can.rx_header.StdId & 0x07F);
-    	if (can_id != hardware.can.id_u.id_value) return;
+
+    	if (can_id == NMT_COB_ID) {
+    		nmt_handler(hardware.can.rx_data_buffer,hardware.can.rx_header.DLC);
+    		return;
+    	} else if (can_id == SYNC_COB_ID) {
+    		sync_handler();
+    		return;
+    	} else if (can_id != hardware.can.id_u.id_value) return;
     		// Check COB-ID
     	int cob_id = (hardware.can.rx_header.StdId & 0x780);
+    	if (hardware.can.state != CAN_STATE_OPERATIONAL) break;
+
 //    	hardware.can.rx_header.DLC
     	switch (cob_id){
 			case RPDO1:
+					// PDO's only work in Operational state
+		    	if (hardware.can.state != CAN_STATE_OPERATIONAL) break;
 
 				break;
 
 			case RPDO2:
+		    	if (hardware.can.state != CAN_STATE_OPERATIONAL) break;
 
 				break;
 
 			case RPDO3:
+		    	if (hardware.can.state != CAN_STATE_OPERATIONAL) break;
 
 				break;
 
 			case RPDO4:
+		    	if (hardware.can.state != CAN_STATE_OPERATIONAL) break;
 
 				break;
 

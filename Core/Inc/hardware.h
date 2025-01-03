@@ -25,10 +25,20 @@
 #define HEARTBEAT_INDEX_OD		0x1017
 #define HEARTBEAT_SUBINDEX_OD	0x00
 
-#define INPUT_INDEX_OD			0x2000
+#define INPUT_INDEX_OD			0x6000
 #define INPUT_SUBINDEX_OD		0x00
-#define OUTPUT_INDEX_OD			0x2001
+#define OUTPUT_INDEX_OD			0x6200
 #define OUTPUT_SUBINDEX_OD		0x00
+
+#define TEMP_INDEX_OD			0x6002
+#define ACCEL_INDEX_OD			0x6003
+#define ACCEL_X_SUBINDEX_OD		0x00
+#define ACCEL_Y_SUBINDEX_OD		0x01
+#define ACCEL_Z_SUBINDEX_OD		0x02
+#define GYRO_INDEX_OD			0x6004
+#define GYRO_X_SUBINDEX_OD		0x00
+#define GYRO_Y_SUBINDEX_OD		0x01
+#define GYRO_Z_SUBINDEX_OD		0x02
 
 
 //Transmit PDO1 (TPDO1)	0x4	0x180 + Node ID
@@ -81,6 +91,25 @@
 #define CAN_BUAD_RATE_PRESCALER_500		18
 #define CAN_BUAD_RATE_PRESCALER_1000	9
 
+// CAN STATE
+#define CAN_STATE_OFF					0
+#define CAN_STATE_INIT					1
+#define CAN_STATE_PREOPERATIONAL		2
+#define CAN_STATE_OPERATIONAL			3
+#define CAN_STATE_STOPPED				4
+
+// NMT COMMANDS
+//Command Name			Command Byte (Hex)	Target State
+//Start Remote Node		0x01				Operational
+//Stop Remote Node		0x02				Stopped
+//Enter Pre-operational	0x80				Pre-operational
+//Reset Node			0x81				Reset Node (reboot)
+//Reset Communication	0x82				Reset communication only
+#define NMT_START					0x01
+#define NMT_STOP					0x02
+#define NMT_PREOPERATIONAL			0x80
+#define NMT_RESET_NODE				0x81
+#define NMT_RESET_COMMS				0x82
 //CMD determines the direction of data transfer and the size of the data object:
 //• 0x23 Sending of 4-byte data (bytes 5 - 8 contains a 32-bit value).
 //• 0x2B Sending of 2-byte data (bytes 5, 6 contains a 16-bit value.
@@ -132,6 +161,9 @@ typedef struct{
 	uint32_t tx_mail_box;
 	uint8_t tx_data_buffer[8];
 	uint8_t rx_data_buffer[8];
+
+	uint8_t state;
+	uint8_t target_state;
 }can_t;
 
 typedef struct{
@@ -166,16 +198,22 @@ typedef struct{
 	}out_u;
 	can_t can;
 
+	uint32_t last_can_state_check_time;
+
 }hardware_t;
 
 // Declare the global instance of hardware_t
 extern hardware_t hardware;
 //Functions
-void hardware_init(CAN_HandleTypeDef *can_handler);
+void hardware_init(void);
 void hardware_monitoring(void);
 void setup_CAN_cfg(void);
 void send_can_packet(int func_code,uint8_t *data,uint32_t data_len);
 void set_outputs(void);
 void read_inputs(void);
 void sdo_handler(uint8_t *packet,uint32_t len);
+void nmt_handler(uint8_t *packet,uint32_t len);
+void sync_handler(void);
+void reboot_device(void);
+void can_state_manager(CAN_HandleTypeDef *can_handler);
 #endif /* INC_HARDWARE_H_ */

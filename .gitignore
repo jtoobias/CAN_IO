@@ -11,6 +11,18 @@ Release/
 *.hex
 *.bin
 *.map
+# Object files
+*.o
+
+# Dependency files
+*.d
+*.su
+
+# Executable and binary files
+*.elf
+*.map
+*.list
+
 
 # STM32CubeMX configuration file
 *.ioc
