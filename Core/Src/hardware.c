@@ -13,10 +13,11 @@ hardware_t hardware;
 // Functions
 
 // used to handle any hardware inits
-void hardware_init(void){
+void hardware_init(CAN_HandleTypeDef *can_handler){
 	//
 	hardware.can.handler = can_handler;
 	hardware.can.state = CAN_STATE_INIT;
+	hardware.can.target_state = CAN_STATE_PREOPERATIONAL;
 }
 
 // Used to poll hardware
@@ -35,6 +36,9 @@ void reboot_device(void) {
   // Call before starting CAN
 void setup_CAN_cfg(void){
 
+	if (HAL_CAN_DeInit(hardware.can.handler) != HAL_OK) {
+        Error_Handler(); // Replace with appropriate error handling
+    }
 	// Read inputs
     hardware.can.id_u.id.bit0 = (HAL_GPIO_ReadPin(CAN_CFG1_GPIO_Port, CAN_CFG1_Pin) == GPIO_PIN_SET);
     hardware.can.id_u.id.bit1 = (HAL_GPIO_ReadPin(CAN_CFG2_GPIO_Port, CAN_CFG2_Pin) == GPIO_PIN_SET);
@@ -53,19 +57,41 @@ void setup_CAN_cfg(void){
 	else if (hardware.can.buad_u.value == 4) hardware.can.handler->Init.Prescaler = CAN_BUAD_RATE_PRESCALER_1000;
 	else hardware.can.handler->Init.Prescaler = CAN_BUAD_RATE_PRESCALER_500;
 
+
+	//init
+	hardware.can.handler->Instance = CAN1;
+	hardware.can.handler->Init.Mode = CAN_MODE_NORMAL;
+	hardware.can.handler->Init.SyncJumpWidth = CAN_SJW_1TQ;
+	hardware.can.handler->Init.TimeSeg1 = CAN_BS1_2TQ;
+	hardware.can.handler->Init.TimeSeg2 = CAN_BS2_1TQ;
+	hardware.can.handler->Init.TimeTriggeredMode = DISABLE;
+	hardware.can.handler->Init.AutoBusOff = DISABLE;
+	hardware.can.handler->Init.AutoWakeUp = DISABLE;
+	hardware.can.handler->Init.AutoRetransmission = DISABLE;
+	hardware.can.handler->Init.ReceiveFifoLocked = DISABLE;
+	hardware.can.handler->Init.TransmitFifoPriority = DISABLE;
+	  if (HAL_CAN_Init(hardware.can.handler) != HAL_OK)
+	  {
+	    Error_Handler();
+	  }
+
     hardware.can.filter.FilterIdHigh = 0x00;
     hardware.can.filter.FilterIdLow = hardware.can.id_u.id_value;
     hardware.can.filter.FilterMaskIdHigh = 0x00;
-    hardware.can.filter.FilterMaskIdLow = hardware.can.id_u.id_value;
+    hardware.can.filter.FilterMaskIdLow = 0x00;
     hardware.can.filter.FilterFIFOAssignment = CAN_RX_FIFO1;
     hardware.can.filter.FilterBank = 0;
     hardware.can.filter.FilterMode = CAN_FILTERMODE_IDMASK;
     hardware.can.filter.FilterScale = CAN_FILTERSCALE_16BIT;
     hardware.can.filter.FilterActivation = CAN_FILTER_ENABLE;
 //    hardware.can.filter.SlaveStartFilterBank = ; //    For single CAN instances, this parameter is meaningless.
-    HAL_CAN_ConfigFilter(hardware.can.handler,&hardware.can.filter);
+    // Apply filter configuration and handle errors
+	if (HAL_CAN_ConfigFilter(hardware.can.handler, &hardware.can.filter) != HAL_OK) {
+	  Error_Handler(); // Replace with appropriate error handling
+	}
 
 }
+
 
 void send_can_packet(int func_code,uint8_t *data,uint32_t data_len){
 
@@ -129,6 +155,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 	uint8_t response[8];
 	uint32_t response_len = 0;
 
+		// Check for a write operation
 	if (cmd & 0x20){
 		// Use data length to get data out (set objects)
 		switch (index){
@@ -152,6 +179,52 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 	} else if (cmd & RD_CLIENT_REQUEST_CMD_BYTE){
 		// Use data length to get data out (set objects)
 		switch (index){
+			case DEVICE_TYPE_INDEX_OD:
+				response[0] = RD_SERVER_RESPONSE_CMD_4_BYTE;
+				*(int16_t*)&response[1] = __REV16(index);
+				response[3] = DEVICE_TYPE_SUBINDEX_OD;
+				// device type is  I/O device
+				response[4] = 0x92;
+				response[5] = 0x01;
+				response[6] = 0x02;
+				response[7] = 0x00;
+				response_len = 8;
+				break;
+
+			case ID_OBJECT_OD:
+				response[0] = RD_SERVER_RESPONSE_CMD_4_BYTE;
+				*(int16_t*)&response[1] = __REV16(index);
+				switch (sub_index){
+					case ID_OBJECT_NUM_ENTRIES_OD:
+						response[3] = ID_OBJECT_NUM_ENTRIES_OD;
+						response[4] = 0x04;
+						response[5] = 0x00;
+						break;
+					case ID_OBJECT_VENDOR_ID_OD:
+						response[3] = ID_OBJECT_VENDOR_ID_OD;
+						response[4] = 0xD2;
+						response[5] = 0x04;
+						break;
+					case ID_OBJECT_PRODUCT_CODE_OD:
+						response[3] = ID_OBJECT_PRODUCT_CODE_OD;
+						response[4] = 0x2E;
+						response[5] = 0x16;
+						break;
+					case ID_OBJECT_REVISION_NUM_OD:
+						response[3] = ID_OBJECT_REVISION_NUM_OD;
+						response[4] = 0x01;
+						response[5] = 0x00;
+						break;
+					default:
+						// shouldn't come here
+						break;
+				}
+
+				response[6] = 0x00;
+				response[7] = 0x00;
+				response_len = 8;
+				break;
+
 			case OUTPUT_INDEX_OD:
 				response[0] = RD_SERVER_RESPONSE_CMD_1_BYTE;
 				*(int16_t*)&response[1] = __REV16(index);
@@ -159,6 +232,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 				response[4] = hardware.out_u.output_value;
 				response_len = 5;
 				break;
+
 			case INPUT_INDEX_OD:
 				response[0] = RD_SERVER_RESPONSE_CMD_1_BYTE;
 				*(int16_t*)&response[1] = __REV16(index);
@@ -167,6 +241,24 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 				response_len = 5;
 				send_can_packet(TSDO,response,response_len);
 				break;
+
+			case TEMP_INDEX_OD:
+				response[0] = RD_SERVER_RESPONSE_CMD_2_BYTE;
+				*(int16_t*)&response[1] = __REV16(index);
+				response[3] = TEMP_SUBINDEX_OD;
+				response[4] = __REV16(ICM42670P.temperature);
+				response_len = 6;
+				send_can_packet(TSDO,response,response_len);
+				break;
+
+//			case TEMP_INDEX_OD:
+//				response[0] = RD_SERVER_RESPONSE_CMD_2_BYTE;
+//				*(int16_t*)&response[1] = __REV16(index);
+//				response[3] = TEMP_SUBINDEX_OD;
+//				response[4] = __REV16(ICM42670P.temperature);
+//				response_len = 6;
+//				send_can_packet(TSDO,response,response_len);
+//				break;
 
 			default:
 				response[0] = CAN_SERVER_RESPONSE_ERROR;
@@ -190,7 +282,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 }
 
 
-void can_state_manager(CAN_HandleTypeDef *can_handler){
+void can_state_manager(void){
 // NODE CONNECTIONS
 // init -> preoperational
 // preoperational -> operational
@@ -203,17 +295,23 @@ void can_state_manager(CAN_HandleTypeDef *can_handler){
 	// Check current states and see requierd action to get to the next state
 	switch (hardware.can.state){
 		case CAN_STATE_INIT:
+
 			hardware.can.state = CAN_STATE_PREOPERATIONAL;
-			HAL_CAN_Stop(&can_handler);
+			hardware.can.target_state = CAN_STATE_PREOPERATIONAL;
+			HAL_CAN_Stop(hardware.can.handler);
 			setup_CAN_cfg();
-			HAL_CAN_Start(&can_handler);
+			HAL_CAN_Start(hardware.can.handler);
+			HAL_CAN_ActivateNotification(hardware.can.handler,CAN_IT_RX_FIFO1_MSG_PENDING);
+
+			uint8_t tmp_arr = 0x00;
+			send_can_packet(HEARTBEAT,&tmp_arr,1);
 			break;
 		case CAN_STATE_PREOPERATIONAL:
-			if (hardware.can.target_state == CAN_STATE_OPERATIONAL) hardware.can.state == CAN_STATE_OPERATIONAL;
+			if (hardware.can.target_state == CAN_STATE_OPERATIONAL) hardware.can.state = CAN_STATE_OPERATIONAL;
 		case CAN_STATE_OPERATIONAL:
 			if (hardware.can.target_state == CAN_STATE_PREOPERATIONAL &&
 				hardware.can.state == CAN_STATE_OPERATIONAL) {
-				hardware.can.state == CAN_STATE_PREOPERATIONAL;
+				hardware.can.state = CAN_STATE_PREOPERATIONAL;
 
 			} else if (hardware.can.target_state == CAN_STATE_INIT) {
 				hardware.can.state = CAN_STATE_INIT;
@@ -223,7 +321,7 @@ void can_state_manager(CAN_HandleTypeDef *can_handler){
 			break;
 		case CAN_STATE_STOPPED:
 			if (hardware.can.target_state == CAN_STATE_PREOPERATIONAL) {
-				hardware.can.state == CAN_STATE_PREOPERATIONAL;
+				hardware.can.state = CAN_STATE_PREOPERATIONAL;
 			} else if (hardware.can.target_state == CAN_STATE_OPERATIONAL) {
 				hardware.can.state = CAN_STATE_OPERATIONAL;
 			} else if (hardware.can.target_state == CAN_STATE_INIT) {
@@ -272,8 +370,6 @@ void sync_handler(void){
 void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *can_handler){
 
     if (HAL_CAN_GetRxMessage(can_handler, CAN_RX_FIFO1, &hardware.can.rx_header, hardware.can.rx_data_buffer) == HAL_OK) {
-    	if (hardware.can.state != CAN_STATE_PREOPERATIONAL ||
-    		hardware.can.state != CAN_STATE_OPERATIONAL) return;
         // Process the received message
     	int can_id = (hardware.can.rx_header.StdId & 0x07F);
 
@@ -286,8 +382,9 @@ void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *can_handler){
     	} else if (can_id != hardware.can.id_u.id_value) return;
     		// Check COB-ID
     	int cob_id = (hardware.can.rx_header.StdId & 0x780);
-    	if (hardware.can.state != CAN_STATE_OPERATIONAL) break;
 
+    	if (hardware.can.state != CAN_STATE_PREOPERATIONAL &&
+    		hardware.can.state != CAN_STATE_OPERATIONAL) return;
 //    	hardware.can.rx_header.DLC
     	switch (cob_id){
 			case RPDO1:
@@ -313,6 +410,10 @@ void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *can_handler){
 
     		case RSDO:
     			sdo_handler(hardware.can.rx_data_buffer,hardware.can.rx_header.DLC);
+    			break;
+
+    		case HEARTBEAT:
+    			// nothing
     			break;
 
     		default:

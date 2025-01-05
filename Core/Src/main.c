@@ -50,6 +50,8 @@ SPI_HandleTypeDef hspi1;
 DMA_HandleTypeDef hdma_spi1_rx;
 DMA_HandleTypeDef hdma_spi1_tx;
 
+TIM_HandleTypeDef htim2;
+
 /* USER CODE BEGIN PV */
 
 volatile uint32_t ms_timer = 0;
@@ -61,6 +63,7 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_CAN_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -107,18 +110,19 @@ int main(void)
   MX_CAN_Init();
   MX_SPI1_Init();
   MX_USB_DEVICE_Init();
-  /* USER CODE BEGIN 2 */
-  	  // Initialize hardware variables such as CAN...
+  MX_TIM2_Init();
+  // Initialize hardware variables such as CAN...
   hardware_init(&hcan);
-  setup_CAN_cfg();
-
-  HAL_CAN_Start(&hcan);
-  HAL_CAN_ActivateNotification(&hcan,CAN_IT_RX_FIFO1_MSG_PENDING);
+  /* USER CODE BEGIN 2 */
+//  setup_CAN_cfg();
+//  HAL_CAN_Start(hardware.can.handler);
+//  HAL_CAN_ActivateNotification(hardware.can.handler,CAN_IT_RX_FIFO1_MSG_PENDING);
 
   hardware.last_can_state_check_time = ms_timer;
   hardware_monitoring();
   ICM42670P_init(&hspi1);
-
+//  hardware.can.state = CAN_STATE_OPERATIONAL;
+//  hardware.can.target_state = CAN_STATE_OPERATIONAL;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -126,7 +130,7 @@ int main(void)
   while (1)
   {
 
-	  uint8_t status = 0;
+//	  uint8_t status = 0;
 //	  sprintf(tx_data_buffer,"%u\r\n",count);
 //	  count++;
 //	  if (count > 100) count = 0;
@@ -134,22 +138,32 @@ int main(void)
 //	  CDC_Transmit_FS((uint8_t *) tx_data_buffer, strlen(tx_data_buffer));
 
 
-	  hardware.can.tx_header.DLC = 1;
-	  hardware.can.tx_header.ExtId = 0x00;
-	  hardware.can.tx_header.StdId = 0x103;
-	  hardware.can.tx_header.IDE = CAN_ID_STD;
-	  hardware.can.tx_header.RTR = CAN_RTR_DATA;
-	  hardware.can.tx_header.TransmitGlobalTime = DISABLE;
-	  tx_data_buffer[0] = 0xf5;
 
-	  HAL_CAN_AddTxMessage(&hcan,&hardware.can.tx_header,tx_data_buffer,&hardware.can.tx_mail_box);
+	  if (hardware.can.state == CAN_STATE_OPERATIONAL){
+		  *(uint16_t*)(&tx_data_buffer[0]) = __REV16(ICM42670P.accel_x);
+		  *(uint16_t*)(&tx_data_buffer[2]) = __REV16(ICM42670P.accel_y);
+		  *(uint16_t*)(&tx_data_buffer[4]) = __REV16(ICM42670P.accel_z);
+		  send_can_packet(TPDO3,tx_data_buffer,6);
+
+		  *(uint16_t*)(&tx_data_buffer[0]) = __REV16(ICM42670P.gyro_x);
+		  *(uint16_t*)(&tx_data_buffer[2]) = __REV16(ICM42670P.gyro_y);
+		  *(uint16_t*)(&tx_data_buffer[4]) = __REV16(ICM42670P.gyro_z);
+		  send_can_packet(TPDO4,tx_data_buffer,6);
+	  }
+
+//	  *(uint16_t*)(&tx_data_buffer[0]) = __REV16(ICM42670P.gyro_x);
+//	  *(uint16_t*)(&tx_data_buffer[2]) = __REV16(ICM42670P.gyro_y);
+//	  *(uint16_t*)(&tx_data_buffer[4]) = __REV16(ICM42670P.gyro_z);
+//	  send_can_packet(TPDO4,tx_data_buffer,6);
+
 //	  status = ICM42670_read_reg(ICM42670_WHOAMI_REG,&rx_data_buffer);
 //	  ICM42670P_update_gyro_data();
 //	  ICM42670P_update_accel_data();
 
 	  	  // Test this (TEST)
 	  if ((ms_timer - hardware.last_can_state_check_time) >= 200){
-		  can_state_manager(&hcan);
+		  hardware.last_can_state_check_time = ms_timer;
+		  can_state_manager();
 	  }
 	  HAL_Delay(100);
     /* USER CODE END WHILE */
@@ -292,6 +306,51 @@ static void MX_SPI1_Init(void)
 }
 
 /**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 72-1;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 1000-1;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+  HAL_TIM_Base_Start_IT(&htim2);
+  /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
   * Enable DMA controller clock
   */
 static void MX_DMA_Init(void)
@@ -386,11 +445,13 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 // INTERRUPTS
-void HAL_SYSTICK_Callback(void) {
-    // Increment a software timer or set a flag for deferred processing
-	ms_timer++;
-}
 
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+    if (htim->Instance == TIM2) {
+        // Custom logic for 1 ms timer
+    	ms_timer++;
+    }
+}
 
 /* USER CODE END 4 */
 

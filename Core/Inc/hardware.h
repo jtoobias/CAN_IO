@@ -16,14 +16,22 @@
 //0x2000	0x00	Inputs state	uint8_t	Read-only
 //0x2001	0x00	Outputs state (can write to this)	uint8_t	Write-only
 //0x1018	0x00	Serial Number	Serial number of the STM32 device	string	Read-only
-
+// COBID
+#define NMT_COB_ID 	0x00
+#define SYNC_COB_ID	0x01
 //OD
 #define DEVICE_TYPE_INDEX_OD	0x1000
 #define DEVICE_TYPE_SUBINDEX_OD	0x00
-#define DEVICE_NAME_INDEX_OD	0x1001
-#define DEVICE_NAME_SUBINDEX_OD	0x00
+
+#define ERROR_REG_INDEX_OD		0x1001
+#define DERROR_REG_SUBINDEX_OD	0x00
 #define HEARTBEAT_INDEX_OD		0x1017
 #define HEARTBEAT_SUBINDEX_OD	0x00
+#define ID_OBJECT_OD				0x1018
+#define ID_OBJECT_NUM_ENTRIES_OD	0x00
+#define ID_OBJECT_VENDOR_ID_OD		0x01
+#define ID_OBJECT_PRODUCT_CODE_OD	0x02
+#define ID_OBJECT_REVISION_NUM_OD	0x03
 
 #define INPUT_INDEX_OD			0x6000
 #define INPUT_SUBINDEX_OD		0x00
@@ -31,6 +39,7 @@
 #define OUTPUT_SUBINDEX_OD		0x00
 
 #define TEMP_INDEX_OD			0x6002
+#define TEMP_SUBINDEX_OD		0x00
 #define ACCEL_INDEX_OD			0x6003
 #define ACCEL_X_SUBINDEX_OD		0x00
 #define ACCEL_Y_SUBINDEX_OD		0x01
@@ -69,6 +78,8 @@
 // SDO's
 #define TSDO			0x580		// Transmitted by the CAN IO board
 #define RSDO			0x600		// Received by the CAN IO board
+//heartbeat
+#define HEARTBEAT		0x700
 
 // SDO write commands (respond with success)
 #define WR_CLIENT_REQUEST_CMD_1_BYTE	0x2F
@@ -117,6 +128,9 @@
 //The Slave answers:
 //• 60 hex Data sent successfully.
 //• 80 hex Error.
+
+
+
 
 // Variables
 typedef struct{
@@ -205,7 +219,7 @@ typedef struct{
 // Declare the global instance of hardware_t
 extern hardware_t hardware;
 //Functions
-void hardware_init(void);
+void hardware_init(CAN_HandleTypeDef *can_handler);
 void hardware_monitoring(void);
 void setup_CAN_cfg(void);
 void send_can_packet(int func_code,uint8_t *data,uint32_t data_len);
@@ -215,5 +229,5 @@ void sdo_handler(uint8_t *packet,uint32_t len);
 void nmt_handler(uint8_t *packet,uint32_t len);
 void sync_handler(void);
 void reboot_device(void);
-void can_state_manager(CAN_HandleTypeDef *can_handler);
+void can_state_manager(void);
 #endif /* INC_HARDWARE_H_ */

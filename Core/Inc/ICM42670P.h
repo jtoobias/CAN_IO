@@ -10,6 +10,7 @@
 // Includes
 #include "stm32f1xx_hal.h"
 #include "main.h"
+#include "ICM42670P.h"
 
 // Defines
 	// REGISTERS

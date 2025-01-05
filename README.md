@@ -5,10 +5,11 @@ Completed:
 - CAN bus is working on new hardware (v1.0.0)
 - Use DMA to get IMU data
 - RSDOs working
+- NMT commands to go from idle -> pre-op -> operation , error -> idle (need to test)
+- ms_timer working
 
 ToDo:
 - Set CAN bus interface with computer for GUI instead of USB for now
-- NMT commands to go from idle -> pre-op -> operation , error -> idle (need to test)
 - Handle PDOs - Periodic send, send on change, send on sync, Store PDO mapping in EEprom 
 - Need to send Unique ID
 - USB still not working due to hardware
