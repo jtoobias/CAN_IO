@@ -89,7 +89,6 @@ void setup_CAN_cfg(void){
 	if (HAL_CAN_ConfigFilter(hardware.can.handler, &hardware.can.filter) != HAL_OK) {
 	  Error_Handler(); // Replace with appropriate error handling
 	}
-
 }
 
 
@@ -362,7 +361,8 @@ void nmt_handler(uint8_t *packet,uint32_t len){
 }
 
 void sync_handler(void){
-	// Place holder for now
+	// Place holder for now (if PDO is configured for Sync it will trigger sends and loads here)
+	HAL_Delay(2);
 
 }
 
@@ -372,17 +372,16 @@ void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *can_handler){
     if (HAL_CAN_GetRxMessage(can_handler, CAN_RX_FIFO1, &hardware.can.rx_header, hardware.can.rx_data_buffer) == HAL_OK) {
         // Process the received message
     	int can_id = (hardware.can.rx_header.StdId & 0x07F);
-
-    	if (can_id == NMT_COB_ID) {
-    		nmt_handler(hardware.can.rx_data_buffer,hardware.can.rx_header.DLC);
-    		return;
-    	} else if (can_id == SYNC_COB_ID) {
-    		sync_handler();
-    		return;
-    	} else if (can_id != hardware.can.id_u.id_value) return;
-    		// Check COB-ID
+		// Check COB-ID
     	int cob_id = (hardware.can.rx_header.StdId & 0x780);
 
+    	if (cob_id == NMT_COB_ID) {
+    		nmt_handler(hardware.can.rx_data_buffer,hardware.can.rx_header.DLC);
+    		return;
+    	}else if (can_id != hardware.can.id_u.id_value)
+    		if (cob_id == SYNC_COB_ID) sync_handler();
+    		return;
+    	if (can_id != hardware.can.id_u.id_value) return;
     	if (hardware.can.state != CAN_STATE_PREOPERATIONAL &&
     		hardware.can.state != CAN_STATE_OPERATIONAL) return;
 //    	hardware.can.rx_header.DLC

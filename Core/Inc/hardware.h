@@ -18,7 +18,7 @@
 //0x1018	0x00	Serial Number	Serial number of the STM32 device	string	Read-only
 // COBID
 #define NMT_COB_ID 	0x00
-#define SYNC_COB_ID	0x01
+#define SYNC_COB_ID	0x80
 //OD
 #define DEVICE_TYPE_INDEX_OD	0x1000
 #define DEVICE_TYPE_SUBINDEX_OD	0x00
