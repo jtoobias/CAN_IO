@@ -62,8 +62,8 @@ void setup_CAN_cfg(void){
 	hardware.can.handler->Instance = CAN1;
 	hardware.can.handler->Init.Mode = CAN_MODE_NORMAL;
 	hardware.can.handler->Init.SyncJumpWidth = CAN_SJW_1TQ;
-	hardware.can.handler->Init.TimeSeg1 = CAN_BS1_2TQ;
-	hardware.can.handler->Init.TimeSeg2 = CAN_BS2_1TQ;
+	hardware.can.handler->Init.TimeSeg1 = CAN_BS1_5TQ;
+	hardware.can.handler->Init.TimeSeg2 = CAN_BS2_3TQ;
 	hardware.can.handler->Init.TimeTriggeredMode = DISABLE;
 	hardware.can.handler->Init.AutoBusOff = DISABLE;
 	hardware.can.handler->Init.AutoWakeUp = DISABLE;
@@ -75,10 +75,14 @@ void setup_CAN_cfg(void){
 	    Error_Handler();
 	  }
 
-    hardware.can.filter.FilterIdHigh = 0x00;
-    hardware.can.filter.FilterIdLow = hardware.can.id_u.id_value;
-    hardware.can.filter.FilterMaskIdHigh = 0x00;
-    hardware.can.filter.FilterMaskIdLow = 0x00;
+//  hardware.can.filter.FilterIdHigh = (0x000 << 5);  // Base ID for global messages like NMT/SYNC
+//  hardware.can.filter.FilterIdLow = (0x580 << 5);  // Base ID for SDO messages
+//  hardware.can.filter.FilterMaskIdHigh = (0x780 << 5);  // Accept NMT, SYNC, SDOs, and IDs in Node group
+//  hardware.can.filter.FilterMaskIdLow = (0x780 << 5);  // Same mask for low filter
+    hardware.can.filter.FilterIdHigh = 0x0000;//(hardware.can.id_u.id_value << 5);
+    hardware.can.filter.FilterIdLow = 0x0000;//(0x580 << 5);  // Base ID for SDO messages
+    hardware.can.filter.FilterMaskIdHigh = 0x0000;//(0x780 << 5);  // Accept NMT, SYNC, SDOs, and IDs in Node group
+    hardware.can.filter.FilterMaskIdLow = 0x0000;//(0x780 << 5);  // Same mask for low filter
     hardware.can.filter.FilterFIFOAssignment = CAN_RX_FIFO1;
     hardware.can.filter.FilterBank = 0;
     hardware.can.filter.FilterMode = CAN_FILTERMODE_IDMASK;
@@ -245,19 +249,60 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 				response[0] = RD_SERVER_RESPONSE_CMD_2_BYTE;
 				*(int16_t*)&response[1] = __REV16(index);
 				response[3] = TEMP_SUBINDEX_OD;
-				response[4] = __REV16(ICM42670P.temperature);
+				*(int16_t*)&response[4] = __REV16(ICM42670P.temperature);
 				response_len = 6;
 				send_can_packet(TSDO,response,response_len);
 				break;
 
-//			case TEMP_INDEX_OD:
-//				response[0] = RD_SERVER_RESPONSE_CMD_2_BYTE;
-//				*(int16_t*)&response[1] = __REV16(index);
-//				response[3] = TEMP_SUBINDEX_OD;
-//				response[4] = __REV16(ICM42670P.temperature);
-//				response_len = 6;
-//				send_can_packet(TSDO,response,response_len);
-//				break;
+			case ACCEL_INDEX_OD:
+				response[0] = RD_SERVER_RESPONSE_CMD_2_BYTE;
+				*(int16_t*)&response[1] = __REV16(index);
+
+				switch (sub_index){
+					case ACCEL_X_SUBINDEX_OD:
+						response[3] = ACCEL_X_SUBINDEX_OD;
+						*(int16_t*)&response[4] = __REV16(ICM42670P.accel_x_conv);
+						break;
+					case ACCEL_Y_SUBINDEX_OD:
+						response[3] = ACCEL_Y_SUBINDEX_OD;
+						*(int16_t*)&response[4] = __REV16(ICM42670P.accel_y_conv);
+						break;
+					case ACCEL_Z_SUBINDEX_OD:
+						response[3] = ACCEL_Z_SUBINDEX_OD;
+						*(int16_t*)&response[4] = __REV16(ICM42670P.accel_z_conv);
+						break;
+					default:
+						// shouldn't come here
+						break;
+				}
+				response_len = 6;
+				send_can_packet(TSDO,response,response_len);
+				break;
+
+				case GYRO_INDEX_OD:
+					response[0] = RD_SERVER_RESPONSE_CMD_2_BYTE;
+					*(int16_t*)&response[1] = __REV16(index);
+
+					switch (sub_index){
+						case GYRO_X_SUBINDEX_OD:
+							response[3] = GYRO_X_SUBINDEX_OD;
+							*(int16_t*)&response[4] = __REV16(ICM42670P.gyro_x_conv);
+							break;
+						case GYRO_Y_SUBINDEX_OD:
+							response[3] = GYRO_Y_SUBINDEX_OD;
+							*(int16_t*)&response[4] = __REV16(ICM42670P.gyro_y_conv);
+							break;
+						case GYRO_Z_SUBINDEX_OD:
+							response[3] = GYRO_Z_SUBINDEX_OD;
+							*(int16_t*)&response[4] = __REV16(ICM42670P.gyro_z_conv);
+							break;
+						default:
+							// shouldn't come here
+							break;
+					}
+					response_len = 6;
+					send_can_packet(TSDO,response,response_len);
+					break;
 
 			default:
 				response[0] = CAN_SERVER_RESPONSE_ERROR;
@@ -368,7 +413,7 @@ void sync_handler(void){
 
 //	Manage CAN messages here, build packet handler
 void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *can_handler){
-
+    HAL_GPIO_TogglePin(OUT0_GPIO_Port, OUT0_Pin); // Example debug pin
     if (HAL_CAN_GetRxMessage(can_handler, CAN_RX_FIFO1, &hardware.can.rx_header, hardware.can.rx_data_buffer) == HAL_OK) {
         // Process the received message
     	int can_id = (hardware.can.rx_header.StdId & 0x07F);
@@ -378,9 +423,10 @@ void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *can_handler){
     	if (cob_id == NMT_COB_ID) {
     		nmt_handler(hardware.can.rx_data_buffer,hardware.can.rx_header.DLC);
     		return;
-    	}else if (can_id != hardware.can.id_u.id_value)
-    		if (cob_id == SYNC_COB_ID) sync_handler();
+    	} else if (can_id != hardware.can.id_u.id_value){
+    		if (cob_id == SYNC_COB_ID && hardware.can.state == CAN_STATE_OPERATIONAL) sync_handler();
     		return;
+    	}
     	if (can_id != hardware.can.id_u.id_value) return;
     	if (hardware.can.state != CAN_STATE_PREOPERATIONAL &&
     		hardware.can.state != CAN_STATE_OPERATIONAL) return;

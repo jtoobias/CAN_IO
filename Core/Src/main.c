@@ -111,16 +111,18 @@ int main(void)
   MX_SPI1_Init();
   MX_USB_DEVICE_Init();
   MX_TIM2_Init();
-  // Initialize hardware variables such as CAN...
-  hardware_init(&hcan);
   /* USER CODE BEGIN 2 */
+  hardware_init(&hcan);
 //  setup_CAN_cfg();
 //  HAL_CAN_Start(hardware.can.handler);
 //  HAL_CAN_ActivateNotification(hardware.can.handler,CAN_IT_RX_FIFO1_MSG_PENDING);
 
   hardware.last_can_state_check_time = ms_timer;
+  hardware.last_can_msg_time = ms_timer;
   hardware_monitoring();
   ICM42670P_init(&hspi1);
+	uint8_t response[8];
+	uint32_t response_len = 0;
 //  hardware.can.state = CAN_STATE_OPERATIONAL;
 //  hardware.can.target_state = CAN_STATE_OPERATIONAL;
   /* USER CODE END 2 */
@@ -139,16 +141,26 @@ int main(void)
 
 
 
-	  if (hardware.can.state == CAN_STATE_OPERATIONAL){
-		  *(uint16_t*)(&tx_data_buffer[0]) = __REV16(ICM42670P.accel_x);
-		  *(uint16_t*)(&tx_data_buffer[2]) = __REV16(ICM42670P.accel_y);
-		  *(uint16_t*)(&tx_data_buffer[4]) = __REV16(ICM42670P.accel_z);
-		  send_can_packet(TPDO3,tx_data_buffer,6);
+	  if ((ms_timer - hardware.last_can_msg_time) >= 1000){
+		  hardware.last_can_msg_time = ms_timer;
+//		  if (hardware.can.state == CAN_STATE_OPERATIONAL){
+//			  *(uint16_t*)(&tx_data_buffer[0]) = __REV16(ICM42670P.accel_x_conv);
+//			  *(uint16_t*)(&tx_data_buffer[2]) = __REV16(ICM42670P.accel_y_conv);
+//			  *(uint16_t*)(&tx_data_buffer[4]) = __REV16(ICM42670P.accel_z_conv);
+//			  send_can_packet(TPDO3,tx_data_buffer,6);
+//
+//			  *(uint16_t*)(&tx_data_buffer[0]) = __REV16(ICM42670P.gyro_x_conv);
+//			  *(uint16_t*)(&tx_data_buffer[2]) = __REV16(ICM42670P.gyro_y_conv);
+//			  *(uint16_t*)(&tx_data_buffer[4]) = __REV16(ICM42670P.gyro_z_conv);
+//			  send_can_packet(TPDO4,tx_data_buffer,6);
 
-		  *(uint16_t*)(&tx_data_buffer[0]) = __REV16(ICM42670P.gyro_x);
-		  *(uint16_t*)(&tx_data_buffer[2]) = __REV16(ICM42670P.gyro_y);
-		  *(uint16_t*)(&tx_data_buffer[4]) = __REV16(ICM42670P.gyro_z);
-		  send_can_packet(TPDO4,tx_data_buffer,6);
+//			response[0] = RD_SERVER_RESPONSE_CMD_2_BYTE;
+//			*(int16_t*)&response[1] = __REV16(ACCEL_INDEX_OD);
+//			response[3] = ID_OBJECT_NUM_ENTRIES_OD;
+//			*(int16_t*)&response[4] = __REV16(ICM42670P.accel_x_conv);
+//			response_len = 6;
+//			send_can_packet(TSDO,response,response_len);
+//		  }
 	  }
 
 //	  *(uint16_t*)(&tx_data_buffer[0]) = __REV16(ICM42670P.gyro_x);
@@ -235,11 +247,11 @@ static void MX_CAN_Init(void)
 
   /* USER CODE END CAN_Init 1 */
   hcan.Instance = CAN1;
-  hcan.Init.Prescaler = 18;
+  hcan.Init.Prescaler = 8;
   hcan.Init.Mode = CAN_MODE_NORMAL;
   hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
-  hcan.Init.TimeSeg1 = CAN_BS1_2TQ;
-  hcan.Init.TimeSeg2 = CAN_BS2_1TQ;
+  hcan.Init.TimeSeg1 = CAN_BS1_5TQ;
+  hcan.Init.TimeSeg2 = CAN_BS2_3TQ;
   hcan.Init.TimeTriggeredMode = DISABLE;
   hcan.Init.AutoBusOff = DISABLE;
   hcan.Init.AutoWakeUp = DISABLE;
@@ -387,7 +399,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, OUT0_Pin|OUT1_Pin|OUT2_Pin|OUT3_Pin
+  HAL_GPIO_WritePin(GPIOA, OUT3_Pin|OUT2_Pin|OUT1_Pin|OUT0_Pin
                           |OUT4_Pin|OUT5_Pin|OUT6_Pin|OUT7_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
@@ -399,10 +411,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : OUT0_Pin OUT1_Pin OUT2_Pin OUT3_Pin
+  /*Configure GPIO pins : OUT3_Pin OUT2_Pin OUT1_Pin OUT0_Pin
                            OUT4_Pin OUT5_Pin OUT6_Pin OUT7_Pin
                            IMU_CS_Pin */
-  GPIO_InitStruct.Pin = OUT0_Pin|OUT1_Pin|OUT2_Pin|OUT3_Pin
+  GPIO_InitStruct.Pin = OUT3_Pin|OUT2_Pin|OUT1_Pin|OUT0_Pin
                           |OUT4_Pin|OUT5_Pin|OUT6_Pin|OUT7_Pin
                           |IMU_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;

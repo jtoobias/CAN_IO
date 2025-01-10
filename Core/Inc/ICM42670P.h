@@ -48,15 +48,17 @@
 #define ICM42670_ACCEL_CONFIG1	0x24
 	// Configuration
 
-#define GYRO_UI_FS_SEL1_RES_X10	164		// (LSB/(º*10/s)) for UI_FS_SEL = 1
-#define GYRO_UI_FS_SEL2_RES_X10	328		// (LSB/(º*10/s)) for UI_FS_SEL = 2
-#define GYRO_UI_FS_SEL3_RES_X10	655		// (LSB/(º*10/s)) for UI_FS_SEL = 3
-#define GYRO_UI_FS_SEL4_RES_X10	1310	// (LSB/(º*10/s)) for UI_FS_SEL = 4
+#define GYRO_UI_FS_SEL1_RES_X10	164		// (LSB*10/(º/s)) for UI_FS_SEL = 1
+#define GYRO_UI_FS_SEL2_RES_X10	328		// (LSB*10/(º/s)) for UI_FS_SEL = 2
+#define GYRO_UI_FS_SEL3_RES_X10	655		// (LSB*10/(º/s)) for UI_FS_SEL = 3
+#define GYRO_UI_FS_SEL4_RES_X10	1310	// (LSB*10/(º/s)) for UI_FS_SEL = 4
 
 #define ACCEL_UI_FS_SEL1_RES	2048	// (LSB/g) for UI_FS_SEL = 1
 #define ACCEL_UI_FS_SEL2_RES	4096	// (LSB/g) for UI_FS_SEL = 2
 #define ACCEL_UI_FS_SEL3_RES	8192	// (LSB/g) for UI_FS_SEL = 3
 #define ACCEL_UI_FS_SEL4_RES	16384	// (LSB/g) for UI_FS_SEL = 4
+
+#define ACCELERATION_G_EARTH_X100 	981	// (m/s/s)*100/g
 
 // Variables declarations
 
@@ -77,9 +79,17 @@ typedef struct {
 	int16_t accel_y;
 	int16_t accel_z;
 
+	int16_t accel_x_conv;		// m*100/s/s
+	int16_t accel_y_conv;		// m*100/s/s
+	int16_t accel_z_conv;		// m*100/s/s
+
 	int16_t gyro_x;
 	int16_t gyro_y;
 	int16_t gyro_z;
+
+	int16_t gyro_x_conv;		// deg*100/s
+	int16_t gyro_y_conv;		// deg*100/s
+	int16_t gyro_z_conv;		// deg*100/s
 
 
 	int32_t temperature;	// degrees*10
