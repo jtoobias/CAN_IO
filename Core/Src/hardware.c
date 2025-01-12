@@ -6,9 +6,12 @@
  */
 #include "hardware.h"
 #include "ICM42670P.h"
+#include "main.h"
+#include <string.h>
 // Variables
 // Define the global instance of hardware_t
 hardware_t hardware;
+volatile uint32_t ms_timer = 0;
 
 // Functions
 
@@ -93,22 +96,96 @@ void setup_CAN_cfg(void){
 	if (HAL_CAN_ConfigFilter(hardware.can.handler, &hardware.can.filter) != HAL_OK) {
 	  Error_Handler(); // Replace with appropriate error handling
 	}
+
+	init_pdo(TPDO1,&hardware.can.tpdo1);
+//	init_pdo(&hardware.can.tpdo2);
+//	init_pdo(&hardware.can.tpdo3);
+//	init_pdo(&hardware.can.tpdo4);
+//
+//	init_pdo(&hardware.can.rpdo1);
+//	init_pdo(&hardware.can.rpdo2);
+//	init_pdo(&hardware.can.rpdo3);
+//	init_pdo(&hardware.can.rpdo4);
+
+}
+
+// Place holder. This will likely be filled in my eeprom variables
+void init_pdo(uint32_t func_code,pdo_t *pdo){
+	pdo->_func_code = func_code;
+	memset(pdo->number_of_bytes, 0, sizeof(pdo->number_of_bytes)); // Set all elements to 0
+	pdo->inhibit_time = 0;
+	pdo->last_send_time = get_ms_timer();
+	pdo->transmit_period = 1000;
+	pdo->mode = PDO_MODE_EVENT;
+	pdo->input_triggers = 0;
+	pdo->analog_thresholds = 0;
 }
 
 
-void send_can_packet(int func_code,uint8_t *data,uint32_t data_len){
+void send_can_packet(uint32_t func_code,uint8_t *data,uint32_t data_len){
 
-	  hardware.can.tx_header.DLC = data_len;
-	  hardware.can.tx_header.ExtId = 0;
-	  hardware.can.tx_header.IDE = CAN_ID_STD;
-	  hardware.can.tx_header.RTR = CAN_RTR_DATA;
-	  hardware.can.tx_header.StdId = func_code | hardware.can.id_u.id_value;
-	  hardware.can.tx_header.TransmitGlobalTime = DISABLE;
-	  for (int i = 0; i < data_len; i++){
-		  hardware.can.tx_data_buffer[i] = *(data + i);
-	  }
-	  HAL_CAN_AddTxMessage(hardware.can.handler,&hardware.can.tx_header,
-			  hardware.can.tx_data_buffer,&hardware.can.tx_mail_box);
+  hardware.can.tx_header.DLC = data_len;
+  hardware.can.tx_header.ExtId = 0;
+  hardware.can.tx_header.IDE = CAN_ID_STD;
+  hardware.can.tx_header.RTR = CAN_RTR_DATA;
+  hardware.can.tx_header.StdId = func_code | hardware.can.id_u.id_value;
+  hardware.can.tx_header.TransmitGlobalTime = DISABLE;
+  for (int i = 0; i < data_len; i++){
+	  hardware.can.tx_data_buffer[i] = *(data + i);
+  }
+  HAL_CAN_AddTxMessage(hardware.can.handler,&hardware.can.tx_header,
+		  hardware.can.tx_data_buffer,&hardware.can.tx_mail_box);
+}
+
+void send_pdo(pdo_t *pdo){
+	uint8_t tx_buffer[8] = {0};
+	uint8_t i = 0, payload_size = 0;
+	// loop through the bytes
+	for (i = 0; i < sizeof(pdo->number_of_bytes);i++){
+		// exit if variable is not setup
+		if (pdo->number_of_bytes[i] == 0) break;
+			// Add variable to the array
+		switch (pdo->number_of_bytes[i]){
+			case 1:
+				tx_buffer[payload_size] = *(int8_t*)pdo->payload[i];
+				payload_size ++;
+				break;
+			case 2:
+				tx_buffer[payload_size] = *(int16_t*)pdo->payload[i];
+				payload_size += 2;
+				break;
+			case 3:
+				tx_buffer[payload_size] = *(int32_t*)pdo->payload[i];
+				payload_size += 4;
+				break;
+			default:
+				// incorrect type
+				break;
+		}
+	}
+	send_can_packet(pdo->_func_code,tx_buffer,payload_size);
+	pdo->last_send_time = get_ms_timer();
+}
+
+	// Given look at all pdo's, check if interval period is set and send if required
+void send_cyclic_pdo(pdo_t* pdo){
+		// Enabled?
+	if (pdo->transmit_period > 0 && pdo->mode == PDO_MODE_EVENT){
+			// Check if ready to send
+		if (diff_ms_timer(pdo->last_send_time) >= pdo->transmit_period &&
+			diff_ms_timer(pdo->last_send_time) >= pdo->inhibit_time){
+			send_pdo(pdo);
+		}
+	}
+}
+
+uint32_t diff_ms_timer(uint32_t last_period){
+	uint32_t diff = ms_timer-last_period;
+	return diff;
+}
+
+uint32_t get_ms_timer(void){
+	return ms_timer;
 }
 
 void set_outputs(void){
@@ -136,9 +213,19 @@ void set_outputs(void){
 	if (hardware.out_u.output.bit7)HAL_GPIO_WritePin(OUT7_GPIO_Port, OUT7_Pin, GPIO_PIN_SET);
 	else HAL_GPIO_WritePin(OUT7_GPIO_Port, OUT7_Pin, GPIO_PIN_RESET);
 }
+
 void read_inputs(void){
+	uint8_t tmp_val = 0;
 	// Read inputs
-    hardware.in_u.input.bit0 = (HAL_GPIO_ReadPin(IN0_GPIO_Port, IN0_Pin) != GPIO_PIN_SET);
+    tmp_val = (HAL_GPIO_ReadPin(IN0_GPIO_Port, IN0_Pin) != GPIO_PIN_SET);
+    if (hardware.in_u.input.bit0 != tmp_val){
+    	// First check if a CAN message needs to be sent
+    	// This needs to be thought through
+
+    	// finally update the variable
+    	hardware.in_u.input.bit0 = (tmp_val == GPIO_PIN_SET);
+    }
+
     hardware.in_u.input.bit1 = (HAL_GPIO_ReadPin(IN1_GPIO_Port, IN1_Pin) != GPIO_PIN_SET);
     hardware.in_u.input.bit2 = (HAL_GPIO_ReadPin(IN2_GPIO_Port, IN2_Pin) != GPIO_PIN_SET);
     hardware.in_u.input.bit3 = (HAL_GPIO_ReadPin(IN3_GPIO_Port, IN3_Pin) != GPIO_PIN_SET);
@@ -166,14 +253,14 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 				hardware.out_u.output_value = data;
 				set_outputs();
 				response[0] = CAN_SERVER_RESPONSE_SUCCESS;
-				*(int16_t*)&response[1] = __REV16(index);
+				*(int16_t*)&response[1] = index;
 				response[3] = OUTPUT_SUBINDEX_OD;
 				response[4] = hardware.out_u.output_value;
 				response_len = 5;
 				break;
 			default:
 				response[0] = CAN_SERVER_RESPONSE_ERROR;
-				*(int16_t*)&response[1] = __REV16(index);
+				*(int16_t*)&response[1] = index;
 				response[3] = sub_index;
 				response_len = 4;
 //				sprintf("[ERROR] CAN Write index not found %d",index);
@@ -184,7 +271,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 		switch (index){
 			case DEVICE_TYPE_INDEX_OD:
 				response[0] = RD_SERVER_RESPONSE_CMD_4_BYTE;
-				*(int16_t*)&response[1] = __REV16(index);
+				*(int16_t*)&response[1] = index;
 				response[3] = DEVICE_TYPE_SUBINDEX_OD;
 				// device type is  I/O device
 				response[4] = 0x92;
@@ -196,7 +283,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 
 			case ID_OBJECT_OD:
 				response[0] = RD_SERVER_RESPONSE_CMD_4_BYTE;
-				*(int16_t*)&response[1] = __REV16(index);
+				*(int16_t*)&response[1] = index;
 				switch (sub_index){
 					case ID_OBJECT_NUM_ENTRIES_OD:
 						response[3] = ID_OBJECT_NUM_ENTRIES_OD;
@@ -230,7 +317,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 
 			case OUTPUT_INDEX_OD:
 				response[0] = RD_SERVER_RESPONSE_CMD_1_BYTE;
-				*(int16_t*)&response[1] = __REV16(index);
+				*(int16_t*)&response[1] = index;
 				response[3] = OUTPUT_SUBINDEX_OD;
 				response[4] = hardware.out_u.output_value;
 				response_len = 5;
@@ -238,7 +325,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 
 			case INPUT_INDEX_OD:
 				response[0] = RD_SERVER_RESPONSE_CMD_1_BYTE;
-				*(int16_t*)&response[1] = __REV16(index);
+				*(int16_t*)&response[1] = index;
 				response[3] = INPUT_SUBINDEX_OD;
 				response[4] = hardware.in_u.input_value;
 				response_len = 5;
@@ -247,7 +334,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 
 			case TEMP_INDEX_OD:
 				response[0] = RD_SERVER_RESPONSE_CMD_2_BYTE;
-				*(int16_t*)&response[1] = __REV16(index);
+				*(int16_t*)&response[1] = index;
 				response[3] = TEMP_SUBINDEX_OD;
 				*(int16_t*)&response[4] = __REV16(ICM42670P.temperature);
 				response_len = 6;
@@ -256,7 +343,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 
 			case ACCEL_INDEX_OD:
 				response[0] = RD_SERVER_RESPONSE_CMD_2_BYTE;
-				*(int16_t*)&response[1] = __REV16(index);
+				*(int16_t*)&response[1] = index;
 
 				switch (sub_index){
 					case ACCEL_X_SUBINDEX_OD:
@@ -281,7 +368,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 
 				case GYRO_INDEX_OD:
 					response[0] = RD_SERVER_RESPONSE_CMD_2_BYTE;
-					*(int16_t*)&response[1] = __REV16(index);
+					*(int16_t*)&response[1] = index;
 
 					switch (sub_index){
 						case GYRO_X_SUBINDEX_OD:
@@ -306,7 +393,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 
 			default:
 				response[0] = CAN_SERVER_RESPONSE_ERROR;
-				*(int16_t*)&response[1] = __REV16(index);
+				*(int16_t*)&response[1] = index;
 				response[3] = sub_index;
 				response_len = 4;
 //				printf("[ERROR] CAN Read index not found %d",index);
@@ -405,15 +492,29 @@ void nmt_handler(uint8_t *packet,uint32_t len){
 	}
 }
 
+// Likely need to handle multiple sends (likely require a global transmit buffer that feeds the CAN FIFO when there is space)
 void sync_handler(void){
 	// Place holder for now (if PDO is configured for Sync it will trigger sends and loads here)
-	HAL_Delay(2);
+	if (hardware.can.tpdo1.mode == PDO_MODE_SYNC){
+		send_pdo(&hardware.can.tpdo1);
+	}
 
+	if (hardware.can.tpdo2.mode == PDO_MODE_SYNC){
+		send_pdo(&hardware.can.tpdo2);
+	}
+
+	if (hardware.can.tpdo3.mode == PDO_MODE_SYNC){
+		send_pdo(&hardware.can.tpdo3);
+	}
+
+	if (hardware.can.tpdo4.mode == PDO_MODE_SYNC){
+		send_pdo(&hardware.can.tpdo4);
+	}
 }
 
 //	Manage CAN messages here, build packet handler
 void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *can_handler){
-    HAL_GPIO_TogglePin(OUT0_GPIO_Port, OUT0_Pin); // Example debug pin
+//    HAL_GPIO_TogglePin(OUT0_GPIO_Port, OUT0_Pin); // Example debug pin
     if (HAL_CAN_GetRxMessage(can_handler, CAN_RX_FIFO1, &hardware.can.rx_header, hardware.can.rx_data_buffer) == HAL_OK) {
         // Process the received message
     	int can_id = (hardware.can.rx_header.StdId & 0x07F);
@@ -489,6 +590,15 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 	}
 }
 
+
+// INTERRUPTS
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+    if (htim->Instance == TIM2) {
+        // Custom logic for 1 ms timer
+    	ms_timer++;
+    }
+}
 //void USB_LP_CAN1_RX0_IRQHandler(void)
 //{
 //    HAL_PCD_IRQHandler(&hpcd_USB_FS);

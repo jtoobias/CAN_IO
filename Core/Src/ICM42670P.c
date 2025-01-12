@@ -176,5 +176,4 @@ void ICM42670P_read_imu_DMA_complete (void){
 	ICM42670P.gyro_x_conv = ((int32_t)ICM42670P.gyro_x*1000)/GYRO_UI_FS_SEL2_RES_X10;
 	ICM42670P.gyro_y_conv = ((int32_t)ICM42670P.gyro_y*1000)/GYRO_UI_FS_SEL2_RES_X10;
 	ICM42670P.gyro_z_conv = ((int32_t)ICM42670P.gyro_z*1000)/GYRO_UI_FS_SEL2_RES_X10;
-
 }

@@ -54,7 +54,6 @@ TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
 
-volatile uint32_t ms_timer = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -117,12 +116,10 @@ int main(void)
 //  HAL_CAN_Start(hardware.can.handler);
 //  HAL_CAN_ActivateNotification(hardware.can.handler,CAN_IT_RX_FIFO1_MSG_PENDING);
 
-  hardware.last_can_state_check_time = ms_timer;
-  hardware.last_can_msg_time = ms_timer;
+  hardware.last_can_state_check_time = get_ms_timer();
+  hardware.last_can_msg_time = get_ms_timer();
   hardware_monitoring();
   ICM42670P_init(&hspi1);
-	uint8_t response[8];
-	uint32_t response_len = 0;
 //  hardware.can.state = CAN_STATE_OPERATIONAL;
 //  hardware.can.target_state = CAN_STATE_OPERATIONAL;
   /* USER CODE END 2 */
@@ -131,53 +128,19 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  // ToDO:
+	  // manage how to get data from structure and send (T)
+	  // Handle pdo setup for interval based sends (T)
+	  // Handle pdo send on sync (T)
+	  // handle pdo on input change
+	  // handle pdo on threshold trigger
 
-//	  uint8_t status = 0;
-//	  sprintf(tx_data_buffer,"%u\r\n",count);
-//	  count++;
-//	  if (count > 100) count = 0;
-//
-//	  CDC_Transmit_FS((uint8_t *) tx_data_buffer, strlen(tx_data_buffer));
+	  send_cyclic_pdo(&hardware.can.tpdo1);
 
-
-
-	  if ((ms_timer - hardware.last_can_msg_time) >= 1000){
-		  hardware.last_can_msg_time = ms_timer;
-//		  if (hardware.can.state == CAN_STATE_OPERATIONAL){
-//			  *(uint16_t*)(&tx_data_buffer[0]) = __REV16(ICM42670P.accel_x_conv);
-//			  *(uint16_t*)(&tx_data_buffer[2]) = __REV16(ICM42670P.accel_y_conv);
-//			  *(uint16_t*)(&tx_data_buffer[4]) = __REV16(ICM42670P.accel_z_conv);
-//			  send_can_packet(TPDO3,tx_data_buffer,6);
-//
-//			  *(uint16_t*)(&tx_data_buffer[0]) = __REV16(ICM42670P.gyro_x_conv);
-//			  *(uint16_t*)(&tx_data_buffer[2]) = __REV16(ICM42670P.gyro_y_conv);
-//			  *(uint16_t*)(&tx_data_buffer[4]) = __REV16(ICM42670P.gyro_z_conv);
-//			  send_can_packet(TPDO4,tx_data_buffer,6);
-
-//			response[0] = RD_SERVER_RESPONSE_CMD_2_BYTE;
-//			*(int16_t*)&response[1] = __REV16(ACCEL_INDEX_OD);
-//			response[3] = ID_OBJECT_NUM_ENTRIES_OD;
-//			*(int16_t*)&response[4] = __REV16(ICM42670P.accel_x_conv);
-//			response_len = 6;
-//			send_can_packet(TSDO,response,response_len);
-//		  }
-	  }
-
-//	  *(uint16_t*)(&tx_data_buffer[0]) = __REV16(ICM42670P.gyro_x);
-//	  *(uint16_t*)(&tx_data_buffer[2]) = __REV16(ICM42670P.gyro_y);
-//	  *(uint16_t*)(&tx_data_buffer[4]) = __REV16(ICM42670P.gyro_z);
-//	  send_can_packet(TPDO4,tx_data_buffer,6);
-
-//	  status = ICM42670_read_reg(ICM42670_WHOAMI_REG,&rx_data_buffer);
-//	  ICM42670P_update_gyro_data();
-//	  ICM42670P_update_accel_data();
-
-	  	  // Test this (TEST)
-	  if ((ms_timer - hardware.last_can_state_check_time) >= 200){
-		  hardware.last_can_state_check_time = ms_timer;
+	  if (diff_ms_timer(hardware.last_can_state_check_time) >= 200){
+		  hardware.last_can_state_check_time = get_ms_timer();
 		  can_state_manager();
 	  }
-	  HAL_Delay(100);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -456,14 +419,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-// INTERRUPTS
-
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-    if (htim->Instance == TIM2) {
-        // Custom logic for 1 ms timer
-    	ms_timer++;
-    }
-}
 
 /* USER CODE END 4 */
 

@@ -40,14 +40,16 @@
 
 #define TEMP_INDEX_OD			0x6002
 #define TEMP_SUBINDEX_OD		0x00
-#define ACCEL_INDEX_OD			0x6003
-#define ACCEL_X_SUBINDEX_OD		0x00
-#define ACCEL_Y_SUBINDEX_OD		0x01
-#define ACCEL_Z_SUBINDEX_OD		0x02
-#define GYRO_INDEX_OD			0x6004
-#define GYRO_X_SUBINDEX_OD		0x00
-#define GYRO_Y_SUBINDEX_OD		0x01
-#define GYRO_Z_SUBINDEX_OD		0x02
+#define ACCEL_INDEX_OD						0x6003
+#define ACCEL_NUM_ENTRIES_SUBINDEX_OD		0x00
+#define ACCEL_X_SUBINDEX_OD					0x01
+#define ACCEL_Y_SUBINDEX_OD					0x02
+#define ACCEL_Z_SUBINDEX_OD					0x03
+#define GYRO_INDEX_OD						0x6004
+#define GYRO_NUM_ENTRIES_SUBINDEX_OD		0x00
+#define GYRO_X_SUBINDEX_OD					0x01
+#define GYRO_Y_SUBINDEX_OD					0x02
+#define GYRO_Z_SUBINDEX_OD					0x03
 
 
 //Transmit PDO1 (TPDO1)	0x4	0x180 + Node ID
@@ -129,7 +131,31 @@
 //• 60 hex Data sent successfully.
 //• 80 hex Error.
 
+#define PDO_MODE_OFF		0x00
+#define PDO_MODE_SYNC		0x01
+#define PDO_MODE_EVENT		0x02
+#define PDO_MODE_REQUEST	0x03
 
+
+
+// PDO mapping can be done by receiving indices which will be used to map the variables to the correct pdo
+typedef struct {
+	uint16_t _func_code;			// Don't edit this
+	uint32_t inhibit_time;			// time in ms: This block sends of the pdo until the time has elapsed
+	uint32_t last_send_time;		// time in ms: The last time the pdo was sent
+
+	void* payload[8];				// This points the the variables that are sent or received in the pdo
+	uint8_t number_of_bytes[8]; 	// This holds the number of bytes for each of the payload variables (0=undefined,1=int8,2=int16,3=int32)
+
+	uint8_t mode;					// PDO mode (OFF [0], periodic[1],sync[1], event[3])
+	uint32_t transmit_period;		// If event mode and a transmit period is set: (0 is OFF)
+
+	uint8_t input_triggers;			// Represents a specific input (8 Digital I/O, 6 Analog = 3 Gyro,3 Accel)
+									// 0=Off, 1=low->high, 2=high->low, 3=both
+
+	int16_t analog_thresholds;		// Thresholds for analog trigger
+
+}pdo_t;
 
 
 // Variables
@@ -178,6 +204,18 @@ typedef struct{
 
 	uint8_t state;
 	uint8_t target_state;
+
+	pdo_t tpdo1;						// This holds the information for the Transmit pdo
+	pdo_t tpdo2;						// This holds the information for the Transmit pdo
+	pdo_t tpdo3;						// This holds the information for the Transmit pdo
+	pdo_t tpdo4;						// This holds the information for the Transmit pdo
+
+	pdo_t rpdo1;						// This holds the information for the Receive pdo
+	pdo_t rpdo2;						// This holds the information for the Receive pdo
+	pdo_t rpdo3;						// This holds the information for the Receive pdo
+	pdo_t rpdo4;						// This holds the information for the Receive pdo
+
+
 }can_t;
 
 typedef struct{
@@ -219,13 +257,21 @@ typedef struct{
 
 // Declare the global instance of hardware_t
 extern hardware_t hardware;
+
 //Functions
 void hardware_init(CAN_HandleTypeDef *can_handler);
+void init_pdo(uint32_t func_code,pdo_t *pdo);
 void hardware_monitoring(void);
 void setup_CAN_cfg(void);
-void send_can_packet(int func_code,uint8_t *data,uint32_t data_len);
+void send_can_packet(uint32_t func_code,uint8_t *data,uint32_t data_len);
+void send_pdo(pdo_t *pdo);
+void send_cyclic_pdo(pdo_t* pdo);
+
+uint32_t diff_ms_timer(uint32_t last_period);
+uint32_t get_ms_timer(void);
 void set_outputs(void);
 void read_inputs(void);
+
 void sdo_handler(uint8_t *packet,uint32_t len);
 void nmt_handler(uint8_t *packet,uint32_t len);
 void sync_handler(void);
