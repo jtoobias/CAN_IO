@@ -116,9 +116,10 @@ void init_pdo(uint32_t func_code,pdo_t *pdo){
 	pdo->inhibit_time = 0;
 	pdo->last_send_time = get_ms_timer();
 	pdo->transmit_period = 1000;
-	pdo->mode = PDO_MODE_EVENT;
-	pdo->input_triggers = 0;
-	pdo->analog_thresholds = 0;
+	memset(pdo->mode, PDO_TRIGGER_OFF, sizeof(pdo->mode));
+
+	memset(pdo->triggers, PDO_TRIGGER_OFF, sizeof(pdo->triggers)); // Set all elements to 0
+	memset(pdo->analog_thresholds, 0, sizeof(pdo->analog_thresholds)); // Set all elements to 0
 }
 
 
@@ -140,6 +141,8 @@ void send_can_packet(uint32_t func_code,uint8_t *data,uint32_t data_len){
 void send_pdo(pdo_t *pdo){
 	uint8_t tx_buffer[8] = {0};
 	uint8_t i = 0, payload_size = 0;
+		// Don't send if the time since last send is less than the inhibit period
+	if (diff_ms_timer(pdo->last_send_time) < pdo->inhibit_time)return;
 	// loop through the bytes
 	for (i = 0; i < sizeof(pdo->number_of_bytes);i++){
 		// exit if variable is not setup
@@ -170,10 +173,9 @@ void send_pdo(pdo_t *pdo){
 	// Given look at all pdo's, check if interval period is set and send if required
 void send_cyclic_pdo(pdo_t* pdo){
 		// Enabled?
-	if (pdo->transmit_period > 0 && pdo->mode == PDO_MODE_EVENT){
+	if (pdo->transmit_period > 0 && pdo->cyclic_mode == TRUE){
 			// Check if ready to send
-		if (diff_ms_timer(pdo->last_send_time) >= pdo->transmit_period &&
-			diff_ms_timer(pdo->last_send_time) >= pdo->inhibit_time){
+		if (diff_ms_timer(pdo->last_send_time) >= pdo->transmit_period){
 			send_pdo(pdo);
 		}
 	}
@@ -189,28 +191,28 @@ uint32_t get_ms_timer(void){
 }
 
 void set_outputs(void){
-	if (hardware.out_u.output.bit0)HAL_GPIO_WritePin(OUT0_GPIO_Port, OUT0_Pin, GPIO_PIN_SET);
+	if (hardware.output.bit0)HAL_GPIO_WritePin(OUT0_GPIO_Port, OUT0_Pin, GPIO_PIN_SET);
 	else HAL_GPIO_WritePin(OUT0_GPIO_Port, OUT0_Pin, GPIO_PIN_RESET);
 
-	if (hardware.out_u.output.bit1)HAL_GPIO_WritePin(OUT1_GPIO_Port, OUT1_Pin, GPIO_PIN_SET);
+	if (hardware.output.bit1)HAL_GPIO_WritePin(OUT1_GPIO_Port, OUT1_Pin, GPIO_PIN_SET);
 	else HAL_GPIO_WritePin(OUT1_GPIO_Port, OUT1_Pin, GPIO_PIN_RESET);
 
-	if (hardware.out_u.output.bit2)HAL_GPIO_WritePin(OUT2_GPIO_Port, OUT2_Pin, GPIO_PIN_SET);
+	if (hardware.output.bit2)HAL_GPIO_WritePin(OUT2_GPIO_Port, OUT2_Pin, GPIO_PIN_SET);
 	else HAL_GPIO_WritePin(OUT2_GPIO_Port, OUT2_Pin, GPIO_PIN_RESET);
 
-	if (hardware.out_u.output.bit3)HAL_GPIO_WritePin(OUT3_GPIO_Port, OUT3_Pin, GPIO_PIN_SET);
+	if (hardware.output.bit3)HAL_GPIO_WritePin(OUT3_GPIO_Port, OUT3_Pin, GPIO_PIN_SET);
 	else HAL_GPIO_WritePin(OUT3_GPIO_Port, OUT3_Pin, GPIO_PIN_RESET);
 
-	if (hardware.out_u.output.bit4)HAL_GPIO_WritePin(OUT4_GPIO_Port, OUT4_Pin, GPIO_PIN_SET);
+	if (hardware.output.bit4)HAL_GPIO_WritePin(OUT4_GPIO_Port, OUT4_Pin, GPIO_PIN_SET);
 	else HAL_GPIO_WritePin(OUT4_GPIO_Port, OUT4_Pin, GPIO_PIN_RESET);
 
-	if (hardware.out_u.output.bit5)HAL_GPIO_WritePin(OUT5_GPIO_Port, OUT5_Pin, GPIO_PIN_SET);
+	if (hardware.output.bit5)HAL_GPIO_WritePin(OUT5_GPIO_Port, OUT5_Pin, GPIO_PIN_SET);
 	else HAL_GPIO_WritePin(OUT5_GPIO_Port, OUT5_Pin, GPIO_PIN_RESET);
 
-	if (hardware.out_u.output.bit6)HAL_GPIO_WritePin(OUT6_GPIO_Port, OUT6_Pin, GPIO_PIN_SET);
+	if (hardware.output.bit6)HAL_GPIO_WritePin(OUT6_GPIO_Port, OUT6_Pin, GPIO_PIN_SET);
 	else HAL_GPIO_WritePin(OUT6_GPIO_Port, OUT6_Pin, GPIO_PIN_RESET);
 
-	if (hardware.out_u.output.bit7)HAL_GPIO_WritePin(OUT7_GPIO_Port, OUT7_Pin, GPIO_PIN_SET);
+	if (hardware.output.bit7)HAL_GPIO_WritePin(OUT7_GPIO_Port, OUT7_Pin, GPIO_PIN_SET);
 	else HAL_GPIO_WritePin(OUT7_GPIO_Port, OUT7_Pin, GPIO_PIN_RESET);
 }
 
@@ -218,21 +220,104 @@ void read_inputs(void){
 	uint8_t tmp_val = 0;
 	// Read inputs
     tmp_val = (HAL_GPIO_ReadPin(IN0_GPIO_Port, IN0_Pin) != GPIO_PIN_SET);
-    if (hardware.in_u.input.bit0 != tmp_val){
-    	// First check if a CAN message needs to be sent
-    	// This needs to be thought through
-
+    if (hardware.input.bit0 != tmp_val){
+    	pdo_input_check_wrapper(0,tmp_val);
     	// finally update the variable
-    	hardware.in_u.input.bit0 = (tmp_val == GPIO_PIN_SET);
+    	hardware.input.bit0 = tmp_val;
     }
+    tmp_val = (HAL_GPIO_ReadPin(IN1_GPIO_Port, IN1_Pin) != GPIO_PIN_SET);
+    if (hardware.input.bit1 != tmp_val){
+    	// First check if a PDO is triggered from this input
+    	pdo_input_check_wrapper(1,tmp_val);
+    	// finally update the variable
+    	hardware.input.bit1 = tmp_val;
+    }
+    tmp_val = (HAL_GPIO_ReadPin(IN2_GPIO_Port, IN2_Pin) != GPIO_PIN_SET);
+    if (hardware.input.bit2 != tmp_val){
+    	// First check if a PDO is triggered from this input
+    	pdo_input_check_wrapper(2,tmp_val);
+    	// finally update the variable
+    	hardware.input.bit2 = tmp_val;
+    }
+    tmp_val = (HAL_GPIO_ReadPin(IN3_GPIO_Port, IN3_Pin) != GPIO_PIN_SET);
+    if (hardware.input.bit3 != tmp_val){
+    	// First check if a PDO is triggered from this input
+    	pdo_input_check_wrapper(3,tmp_val);
+    	// finally update the variable
+    	hardware.input.bit3 = tmp_val;
+    }
+    tmp_val = (HAL_GPIO_ReadPin(IN4_GPIO_Port, IN4_Pin) != GPIO_PIN_SET);
+    if (hardware.input.bit4 != tmp_val){
+    	// First check if a PDO is triggered from this input
+    	pdo_input_check_wrapper(4,tmp_val);
+    	// finally update the variable
+    	hardware.input.bit4 = tmp_val;
+    }
+    tmp_val = (HAL_GPIO_ReadPin(IN5_GPIO_Port, IN5_Pin) != GPIO_PIN_SET);
+    if (hardware.input.bit5 != tmp_val){
+    	// First check if a PDO is triggered from this input
+    	pdo_input_check_wrapper(5,tmp_val);
+    	// finally update the variable
+    	hardware.input.bit5 = tmp_val;
+    }
+    tmp_val = (HAL_GPIO_ReadPin(IN6_GPIO_Port, IN6_Pin) != GPIO_PIN_SET);
+    if (hardware.input.bit6 != tmp_val){
+    	// First check if a PDO is triggered from this input
+    	pdo_input_check_wrapper(6,tmp_val);
+    	// finally update the variable
+    	hardware.input.bit6 = tmp_val;
+    }
+    tmp_val = (HAL_GPIO_ReadPin(IN7_GPIO_Port, IN7_Pin) != GPIO_PIN_SET);
+    if (hardware.input.bit7 != tmp_val){
+    	// First check if a PDO is triggered from this input
+    	pdo_input_check_wrapper(7,tmp_val);
+    	// finally update the variable
+    	hardware.input.bit7 = tmp_val;
+    }
+}
 
-    hardware.in_u.input.bit1 = (HAL_GPIO_ReadPin(IN1_GPIO_Port, IN1_Pin) != GPIO_PIN_SET);
-    hardware.in_u.input.bit2 = (HAL_GPIO_ReadPin(IN2_GPIO_Port, IN2_Pin) != GPIO_PIN_SET);
-    hardware.in_u.input.bit3 = (HAL_GPIO_ReadPin(IN3_GPIO_Port, IN3_Pin) != GPIO_PIN_SET);
-    hardware.in_u.input.bit4 = (HAL_GPIO_ReadPin(IN4_GPIO_Port, IN4_Pin) != GPIO_PIN_SET);
-    hardware.in_u.input.bit5 = (HAL_GPIO_ReadPin(IN5_GPIO_Port, IN5_Pin) != GPIO_PIN_SET);
-    hardware.in_u.input.bit6 = (HAL_GPIO_ReadPin(IN6_GPIO_Port, IN6_Pin) != GPIO_PIN_SET);
-    hardware.in_u.input.bit7 = (HAL_GPIO_ReadPin(IN7_GPIO_Port, IN7_Pin) != GPIO_PIN_SET);
+int8_t pdo_input_check_wrapper(uint8_t input_index, uint8_t new_val){
+	int8_t debug_status = FALSE;
+	// First check if a PDO is triggered from this input
+	debug_status = pdo_input_check_and_send(&hardware.can.tpdo1,input_index,new_val);
+	if (debug_status == UNKNOWN) return UNKNOWN;
+	debug_status = pdo_input_check_and_send(&hardware.can.tpdo2,input_index,new_val);
+	if (debug_status == UNKNOWN) return UNKNOWN;
+	debug_status = pdo_input_check_and_send(&hardware.can.tpdo3,input_index,new_val);
+	if (debug_status == UNKNOWN) return UNKNOWN;
+	debug_status = pdo_input_check_and_send(&hardware.can.tpdo4,input_index,new_val);
+	if (debug_status == UNKNOWN) return UNKNOWN;
+	return TRUE;
+}
+
+// Check if the input triggers a PDO send and for what Input transition
+int8_t pdo_input_check_and_send(pdo_t* tpdo,uint8_t input_index,uint8_t new_val){
+
+			// This bit shift should be checked
+	if ((tpdo->event_mode_val & (1<<input_index)) == FALSE){
+		return FALSE;
+	} else {
+		if (tpdo->triggers[input_index] == PDO_TRIGGER_HIGH_TO_LOW){
+				// High -> Low
+			if ((hardware.input_value & (1<<input_index)) > (new_val)){
+				// Send PDO
+				send_pdo(tpdo);
+				return TRUE;
+			}
+		} else if (tpdo->triggers[input_index] == PDO_TRIGGER_HIGH_TO_LOW){
+				// Low -> High
+			if ((hardware.input_value & (1<<input_index)) < (new_val)){
+				// Send PDO
+				send_pdo(tpdo);
+				return TRUE;
+			}
+		} else if (tpdo->triggers[input_index] == PDO_TRIGGER_BOTH){
+			// Send PDO
+			send_pdo(tpdo);
+			return TRUE;
+		}
+	}
+	return FALSE;
 }
 
 void sdo_handler(uint8_t *packet,uint32_t len){
@@ -250,12 +335,12 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 		// Use data length to get data out (set objects)
 		switch (index){
 			case OUTPUT_INDEX_OD:
-				hardware.out_u.output_value = data;
+				hardware.output_value = data;
 				set_outputs();
 				response[0] = CAN_SERVER_RESPONSE_SUCCESS;
 				*(int16_t*)&response[1] = index;
 				response[3] = OUTPUT_SUBINDEX_OD;
-				response[4] = hardware.out_u.output_value;
+				response[4] = hardware.output_value;
 				response_len = 5;
 				break;
 			default:
@@ -319,7 +404,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 				response[0] = RD_SERVER_RESPONSE_CMD_1_BYTE;
 				*(int16_t*)&response[1] = index;
 				response[3] = OUTPUT_SUBINDEX_OD;
-				response[4] = hardware.out_u.output_value;
+				response[4] = hardware.output_value;
 				response_len = 5;
 				break;
 
@@ -327,7 +412,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 				response[0] = RD_SERVER_RESPONSE_CMD_1_BYTE;
 				*(int16_t*)&response[1] = index;
 				response[3] = INPUT_SUBINDEX_OD;
-				response[4] = hardware.in_u.input_value;
+				response[4] = hardware.input_value;
 				response_len = 5;
 				send_can_packet(TSDO,response,response_len);
 				break;
@@ -495,21 +580,62 @@ void nmt_handler(uint8_t *packet,uint32_t len){
 // Likely need to handle multiple sends (likely require a global transmit buffer that feeds the CAN FIFO when there is space)
 void sync_handler(void){
 	// Place holder for now (if PDO is configured for Sync it will trigger sends and loads here)
-	if (hardware.can.tpdo1.mode == PDO_MODE_SYNC){
+	if (hardware.can.tpdo1.sync_mode_val == TRUE){
 		send_pdo(&hardware.can.tpdo1);
 	}
 
-	if (hardware.can.tpdo2.mode == PDO_MODE_SYNC){
+	if (hardware.can.tpdo2.sync_mode_val == TRUE){
 		send_pdo(&hardware.can.tpdo2);
 	}
 
-	if (hardware.can.tpdo3.mode == PDO_MODE_SYNC){
+	if (hardware.can.tpdo3.sync_mode_val == TRUE){
 		send_pdo(&hardware.can.tpdo3);
 	}
 
-	if (hardware.can.tpdo4.mode == PDO_MODE_SYNC){
+	if (hardware.can.tpdo4.sync_mode_val == TRUE){
 		send_pdo(&hardware.can.tpdo4);
 	}
+
+	// Handle RPDOs:
+	pdo_sync_output_check_and_update(&hardware.can.rpdo1);
+	pdo_sync_output_check_and_update(&hardware.can.rpdo2);
+	pdo_sync_output_check_and_update(&hardware.can.rpdo3);
+	pdo_sync_output_check_and_update(&hardware.can.rpdo4);
+}
+
+//void update outputs from CAN PDO sync
+int8_t pdo_sync_output_check_and_update(pdo_t* rpdo){
+	// For output based RPDOs first set the outputs before updating the variables.
+	// This makes sure all devices are sync'd on the following sync call
+	//check if sync mode is active
+	if (rpdo->sync_mode_val == FALSE){
+		return FALSE;
+	} else {
+		// check mapping for output control
+		for (int i = 0; i<sizeof(rpdo->mapped_indices); i++){
+			if (rpdo->mapped_indices[i] == (OUTPUT_INDEX_OD<<8|OUTPUT_SUBINDEX_OD)){
+				// Output is controlled by this pdo
+				set_outputs();
+				switch (rpdo->number_of_bytes[i]){
+					case PDO_NUMBER_OF_BYTES_1:
+						// update output variables from the payload
+						hardware.output_value = (*(uint8_t*)rpdo->payload[i] & 0x00FF);
+						break;
+					case PDO_NUMBER_OF_BYTES_2:
+						// update output variables from the payload
+						hardware.output_value = (*(uint16_t*)rpdo->payload[i] & 0xFFFF);
+						break;
+					default:
+						// Problems wrong type
+						return UNKNOWN;
+						break;
+
+				}
+				return TRUE;
+			}
+		}
+	}
+	return FALSE;
 }
 
 //	Manage CAN messages here, build packet handler

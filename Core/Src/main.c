@@ -129,10 +129,11 @@ int main(void)
   while (1)
   {
 	  // ToDO:
+	  // Create can_manager.c and .h file. Add tx buffer
 	  // manage how to get data from structure and send (T)
 	  // Handle pdo setup for interval based sends (T)
 	  // Handle pdo send on sync (T)
-	  // handle pdo on input change
+	  // handle pdo on input change (T)
 	  // handle pdo on threshold trigger
 
 	  send_cyclic_pdo(&hardware.can.tpdo1);

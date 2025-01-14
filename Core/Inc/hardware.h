@@ -9,6 +9,10 @@
 #define INC_HARDWARE_H_
 #include "stm32f1xx_hal.h"
 #include "main.h"
+
+#define TRUE 	1
+#define FALSE	0
+#define UNKNOWN	-1
 //0x1000	0x00	Device Type	The type of the device	uint32_t	Read-only
 //0x1001	0x00	Device Name	The name of the device	string	Read-only
 //0x1017	0x00	Heartbeat	Heartbeat object for device status	uint8_t	Read/Write
@@ -131,29 +135,68 @@
 //• 60 hex Data sent successfully.
 //• 80 hex Error.
 
-#define PDO_MODE_OFF		0x00
-#define PDO_MODE_SYNC		0x01
-#define PDO_MODE_EVENT		0x02
-#define PDO_MODE_REQUEST	0x03
+//#define PDO_MODE_OFF		0x00
+//#define PDO_MODE_SYNC		0x01
+//#define PDO_MODE_EVENT	0x02
+//#define PDO_MODE_REQUEST	0x03
+
+#define PDO_TRIGGER_OFF				0x00
+#define PDO_TRIGGER_LOW_TO_HIGH		0x01
+#define PDO_TRIGGER_HIGH_TO_LOW		0x02
+#define PDO_TRIGGER_BOTH			0x03
+
+#define PDO_NUMBER_OF_ANALOG_TRIGGERS		6		// 6 analog
+#define PDO_NUMBER_OF_DIGITAL_TRIGGERS		8		// 6 analog
+#define PDO_NUMBER_OF_TRIGGERS		PDO_NUMBER_OF_ANALOG_TRIGGERS+PDO_NUMBER_OF_DIGITAL_TRIGGERS		// 8 digital i/o , 6 analog
+
+#define PDO_NUMBER_OF_BYTES_0		0x00
+#define PDO_NUMBER_OF_BYTES_1		0x01
+#define PDO_NUMBER_OF_BYTES_2		0x02
+#define PDO_NUMBER_OF_BYTES_4		0x03
 
 
 
 // PDO mapping can be done by receiving indices which will be used to map the variables to the correct pdo
 typedef struct {
-	uint16_t _func_code;			// Don't edit this
-	uint32_t inhibit_time;			// time in ms: This block sends of the pdo until the time has elapsed
-	uint32_t last_send_time;		// time in ms: The last time the pdo was sent
+	uint16_t _func_code;					// Don't edit this
+	uint32_t inhibit_time;					// time in ms: This block sends of the pdo until the time has elapsed
+	uint32_t last_send_time;				// time in ms: The last time the pdo was sent
 
-	void* payload[8];				// This points the the variables that are sent or received in the pdo
-	uint8_t number_of_bytes[8]; 	// This holds the number of bytes for each of the payload variables (0=undefined,1=int8,2=int16,3=int32)
+	void* payload[8];						// This points the the variables that are sent or received in the pdo
+	uint8_t number_of_bytes[8]; 			// This holds the number of bytes for each of the payload variables
+											// (0=undefined,1=int8,2=int16,3=int32)
+	uint32_t mapped_indices[8]; 			// This holds the OD indices of the mapped variables: Used to know the contents of the payload
 
-	uint8_t mode;					// PDO mode (OFF [0], periodic[1],sync[1], event[3])
-	uint32_t transmit_period;		// If event mode and a transmit period is set: (0 is OFF)
+	union{
+		struct{
+			uint8_t sync_mode_val;
+			union{
+				struct{
+					uint8_t bit0		:1;
+					uint8_t bit1		:1;
+					uint8_t bit2		:1;
+					uint8_t bit3		:1;
+					uint8_t bit4		:1;
+					uint8_t bit5		:1;
+					uint8_t bit6		:1;
+					uint8_t bit7		:1;
+				}event_mode;
+				uint8_t event_mode_val;
+			};
+			uint8_t cyclic_mode;					// This is meant to be part of event mode, but having its own flag makes it easier
+			uint8_t request_mode_val;
+		};
+		uint8_t mode[4];							// PDO mode (sync[0], event[1],cyclic[2], Request[3])
+	};
 
-	uint8_t input_triggers;			// Represents a specific input (8 Digital I/O, 6 Analog = 3 Gyro,3 Accel)
-									// 0=Off, 1=low->high, 2=high->low, 3=both
 
-	int16_t analog_thresholds;		// Thresholds for analog trigger
+
+	uint32_t transmit_period;					// If event mode and a transmit period is set: (0 is OFF)
+
+	uint8_t triggers[PDO_NUMBER_OF_TRIGGERS];	// Represents a specific input (8 Digital I/O, 6 Analog = 3 Gyro,3 Accel)
+												// 0=Off, 1=low->high, 2=high->low, 3=both, (This array is in order. DIO 1->8,xyzGyro,xyzAccel)
+
+	int16_t analog_thresholds[PDO_NUMBER_OF_ANALOG_TRIGGERS];				// Thresholds for analog trigger
 
 }pdo_t;
 
@@ -223,31 +266,31 @@ typedef struct{
 		// This holds the current input values
 	union {
 		struct{
-			uint8_t bit0		:1;
-			uint8_t bit1		:1;
-			uint8_t bit2		:1;
-			uint8_t bit3		:1;
-			uint8_t bit4		:1;
-			uint8_t bit5		:1;
-			uint8_t bit6		:1;
-			uint8_t bit7		:1;
+			uint16_t bit0		:1;
+			uint16_t bit1		:1;
+			uint16_t bit2		:1;
+			uint16_t bit3		:1;
+			uint16_t bit4		:1;
+			uint16_t bit5		:1;
+			uint16_t bit6		:1;
+			uint16_t bit7		:1;
 		}input;
-		uint8_t input_value;
-	}in_u;
+		uint16_t input_value;
+	};
 
 	union {
 		struct{
-			uint8_t bit0		:1;
-			uint8_t bit1		:1;
-			uint8_t bit2		:1;
-			uint8_t bit3		:1;
-			uint8_t bit4		:1;
-			uint8_t bit5		:1;
-			uint8_t bit6		:1;
-			uint8_t bit7		:1;
+			uint16_t bit0		:1;
+			uint16_t bit1		:1;
+			uint16_t bit2		:1;
+			uint16_t bit3		:1;
+			uint16_t bit4		:1;
+			uint16_t bit5		:1;
+			uint16_t bit6		:1;
+			uint16_t bit7		:1;
 		}output;
-		uint8_t output_value;
-	}out_u;
+		uint16_t output_value;
+	};
 	can_t can;
 
 	uint32_t last_can_state_check_time;
@@ -266,6 +309,9 @@ void setup_CAN_cfg(void);
 void send_can_packet(uint32_t func_code,uint8_t *data,uint32_t data_len);
 void send_pdo(pdo_t *pdo);
 void send_cyclic_pdo(pdo_t* pdo);
+int8_t pdo_sync_output_check_and_update(pdo_t* rpdo);
+int8_t pdo_input_check_wrapper(uint8_t input_index, uint8_t new_val);
+int8_t pdo_input_check_and_send(pdo_t* tpdo,uint8_t input_index,uint8_t new_val);
 
 uint32_t diff_ms_timer(uint32_t last_period);
 uint32_t get_ms_timer(void);
