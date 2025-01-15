@@ -23,9 +23,9 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "hardware.h"
+
 #include "usbd_cdc_if.h"
 #include "string.h"
-#include "ICM42670P.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -111,17 +111,16 @@ int main(void)
   MX_USB_DEVICE_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  hardware_init(&hcan);
+  hardware_init(&hcan,&hspi1);
 //  setup_CAN_cfg();
-//  HAL_CAN_Start(hardware.can.handler);
-//  HAL_CAN_ActivateNotification(hardware.can.handler,CAN_IT_RX_FIFO1_MSG_PENDING);
+//  HAL_CAN_Start(can.handler);
+//  HAL_CAN_ActivateNotification(can.handler,CAN_IT_RX_FIFO1_MSG_PENDING);
 
   hardware.last_can_state_check_time = get_ms_timer();
   hardware.last_can_msg_time = get_ms_timer();
   hardware_monitoring();
-  ICM42670P_init(&hspi1);
-//  hardware.can.state = CAN_STATE_OPERATIONAL;
-//  hardware.can.target_state = CAN_STATE_OPERATIONAL;
+//  can.state = CAN_STATE_OPERATIONAL;
+//  can.target_state = CAN_STATE_OPERATIONAL;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -136,7 +135,7 @@ int main(void)
 	  // handle pdo on input change (T)
 	  // handle pdo on threshold trigger
 
-	  send_cyclic_pdo(&hardware.can.tpdo1);
+	  send_cyclic_pdo(&can.tpdo1);
 
 	  if (diff_ms_timer(hardware.last_can_state_check_time) >= 200){
 		  hardware.last_can_state_check_time = get_ms_timer();
