@@ -101,14 +101,24 @@ void setup_CAN_cfg(void){
 void init_pdo(uint32_t func_code,pdo_t *pdo){
 	pdo->_func_code = func_code;
 	memset(pdo->number_of_bytes, 0, sizeof(pdo->number_of_bytes)); // Set all elements to 0
-	pdo->inhibit_time = 0;
+	pdo->inhibit_time = 1500;
 	pdo->last_send_time = get_ms_timer();
 	pdo->transmit_period = 1000;
 	memset(pdo->mode, PDO_MODE_OFF, sizeof(pdo->mode));
-	pdo->mode[PDO_MODE_CYCLIC_INDEX] = PDO_MODE_ON;
+
+	pdo->cyclic_mode = PDO_MODE_OFF;
+	pdo->sync_mode_val = PDO_MODE_ON;
 
 	memset(pdo->triggers, PDO_TRIGGER_OFF, sizeof(pdo->triggers)); // Set all elements to 0
 	memset(pdo->analog_thresholds, 0, sizeof(pdo->analog_thresholds)); // Set all elements to 0
+
+
+	pdo->payload[0] = (int16_t*)&ICM42670P.accel_x_conv;
+	pdo->payload[1] = (int16_t*)&ICM42670P.accel_y_conv;
+	pdo->payload[2] = (int16_t*)&ICM42670P.accel_z_conv;
+	pdo->number_of_bytes[0] = PDO_NUMBER_OF_BYTES_2;
+	pdo->number_of_bytes[1] = PDO_NUMBER_OF_BYTES_2;
+	pdo->number_of_bytes[2] = PDO_NUMBER_OF_BYTES_2;
 }
 
 
@@ -128,11 +138,11 @@ void send_pdo(pdo_t *pdo){
 				payload_size ++;
 				break;
 			case 2:
-				tx_buffer[payload_size] = *(int16_t*)pdo->payload[i];
+				*(int16_t*)&tx_buffer[payload_size] = *(int16_t*)pdo->payload[i];
 				payload_size += 2;
 				break;
 			case 3:
-				tx_buffer[payload_size] = *(int32_t*)pdo->payload[i];
+				*(int32_t*)&tx_buffer[payload_size] = *(int32_t*)pdo->payload[i];
 				payload_size += 4;
 				break;
 			default:
