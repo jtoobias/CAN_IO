@@ -23,10 +23,10 @@ uint8_t ICM42670P_init (SPI_HandleTypeDef *hSPI){
 	uint8_t status = 0;
 	//  Init for ICM42670
 	status |= (ICM42670P_write_reg(ICM42670_PWRMGMT0_REG,0x0F) == HAL_OK);
-	//   4+-g, 400 Hz
-	status |= (ICM42670P_write_reg(ICM42670_ACCEL_CONFIG0,0x27) == HAL_OK);
-	//  1000+-, 400 Hz
-	status |= (ICM42670P_write_reg(ICM42670_GYRO_CONFIG0,0x27) == HAL_OK);
+	//   4+-g, 50 Hz (0x0B), 100Hz (0x0A), 400Hz (0x07)
+	status |= (ICM42670P_write_reg(ICM42670_ACCEL_CONFIG0,0x2A) == HAL_OK);
+	//  1000+-, 50 Hz(0x0B), 100Hz (0x0A), 400Hz (0x07)
+	status |= (ICM42670P_write_reg(ICM42670_GYRO_CONFIG0,0x2A) == HAL_OK);
 	// Int1 = active high, push pull, pulse 0x03
 	status |= (ICM42670P_write_reg(ICM42670_INT_CONFIG,0x03) == HAL_OK);
 	// Int1 trigger on ready data
@@ -153,6 +153,8 @@ uint8_t ICM42670P_read_imu_DMA (void){
 	}
 }
 
+// This whole function might take around 0.5us to complete (division is very costly x10 for than multiplication,
+// but floating point is just as bad on the uC)
 void ICM42670P_read_imu_DMA_complete (void){
 	// Read completed, de-select the chip
 	HAL_GPIO_WritePin(IMU_CS_GPIO_Port,IMU_CS_Pin,GPIO_PIN_SET);

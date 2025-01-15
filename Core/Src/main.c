@@ -127,6 +127,22 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  //test sends
+
+	  if (diff_ms_timer(hardware.last_can_msg_time) >= 1){
+		  hardware.last_can_msg_time = get_ms_timer();
+
+		  tx_data_buffer[0] = 0x12;
+		  tx_data_buffer[1] = 0x23;
+		  tx_data_buffer[2] = 0x45;
+		  tx_data_buffer[3] = 0x56;
+		  tx_data_buffer[4] = 0x67;
+		  tx_data_buffer[5] = 0x78;
+		  tx_data_buffer[6] = 0x89;
+		  tx_data_buffer[7] = 0xAB;
+		  send_can_packet(TSDO, tx_data_buffer, 8);
+	  }
+
 	  // ToDO:
 	  // Create can_manager.c and .h file. Add tx buffer
 	  // manage how to get data from structure and send (T)
@@ -135,10 +151,11 @@ int main(void)
 	  // handle pdo on input change (T)
 	  // handle pdo on threshold trigger
 
-	  send_cyclic_pdo(&can.tpdo1);
+//	  send_cyclic_pdo(&can.tpdo1);
 
 	  if (diff_ms_timer(hardware.last_can_state_check_time) >= 200){
 		  hardware.last_can_state_check_time = get_ms_timer();
+
 		  can_state_manager();
 	  }
     /* USER CODE END WHILE */

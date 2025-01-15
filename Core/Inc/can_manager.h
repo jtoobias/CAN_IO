@@ -9,7 +9,7 @@
 #define INC_CAN_MANAGER_H_
 #include "stm32f1xx_hal.h"
 
-#define CAN_TX_BUFFER_SIZE 8 // Adjust as needed
+#define CAN_TX_BUFFER_SIZE 12 // Adjust as needed
 
 //0x1000	0x00	Device Type	The type of the device	uint32_t	Read-only
 //0x1001	0x00	Device Name	The name of the device	string	Read-only
@@ -133,10 +133,13 @@
 //• 60 hex Data sent successfully.
 //• 80 hex Error.
 
-//#define PDO_MODE_OFF		0x00
-//#define PDO_MODE_SYNC		0x01
-//#define PDO_MODE_EVENT	0x02
-//#define PDO_MODE_REQUEST	0x03
+#define PDO_MODE_OFF			0x00
+#define PDO_MODE_ON				0x01
+
+#define PDO_MODE_SYNC_INDEX			0x00
+#define PDO_MODE_EVENT_INDEX		0x01
+#define PDO_MODE_CYCLIC_INDEX		0x02
+#define PDO_MODE_RTR_INDEX			0x03
 
 #define PDO_TRIGGER_OFF				0x00
 #define PDO_TRIGGER_LOW_TO_HIGH		0x01
@@ -290,6 +293,7 @@ void can_state_manager(void);
 int is_buffer_full();
 int is_buffer_empty();
 int enqueue_packet(CAN_Packet *packet);
+int add_packet_to_front_of_queue(CAN_Packet *packet);
 int dequeue_packet(CAN_Packet *packet);
 void CAN_TxHandler(CAN_HandleTypeDef *hcan);
 int8_t send_can_packet(uint32_t func_code,uint8_t *data,uint32_t data_len);

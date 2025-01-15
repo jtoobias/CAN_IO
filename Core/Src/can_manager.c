@@ -104,7 +104,8 @@ void init_pdo(uint32_t func_code,pdo_t *pdo){
 	pdo->inhibit_time = 0;
 	pdo->last_send_time = get_ms_timer();
 	pdo->transmit_period = 1000;
-	memset(pdo->mode, PDO_TRIGGER_OFF, sizeof(pdo->mode));
+	memset(pdo->mode, PDO_MODE_OFF, sizeof(pdo->mode));
+	pdo->mode[PDO_MODE_CYCLIC_INDEX] = PDO_MODE_ON;
 
 	memset(pdo->triggers, PDO_TRIGGER_OFF, sizeof(pdo->triggers)); // Set all elements to 0
 	memset(pdo->analog_thresholds, 0, sizeof(pdo->analog_thresholds)); // Set all elements to 0
@@ -600,6 +601,19 @@ int enqueue_packet(CAN_Packet *packet) {
     return TRUE;
 }
 
+// Add a packet to the buffer
+int add_packet_to_front_of_queue(CAN_Packet *packet) {
+    if (is_buffer_full()) {
+        return FALSE; // Buffer full, drop the packet
+    }
+
+	// Increment and manager wrap around of buffer
+    can.tx_buffer.tail = (can.tx_buffer.tail - 1 + CAN_TX_BUFFER_SIZE) % CAN_TX_BUFFER_SIZE;
+    	// Add to
+    can.tx_buffer.buffer[can.tx_buffer.tail] = *packet;
+    return TRUE;
+}
+
 // Retrieve a packet from the buffer
 int dequeue_packet(CAN_Packet *packet) {
     if (is_buffer_empty()) {
@@ -620,16 +634,17 @@ void CAN_TxHandler(CAN_HandleTypeDef *hcan) {
         uint32_t free_mailbox;
         // Mailbox free? and message being sent? and are there packets to send?
         if (HAL_CAN_GetTxMailboxesFreeLevel(hcan) > 0 &&
-            HAL_CAN_IsTxMessagePending(hcan, (CAN_TX_MAILBOX0 | CAN_TX_MAILBOX1 | CAN_TX_MAILBOX2)) == 0 &&
             dequeue_packet(&packet) == TRUE) {
             // Attempt to transmit the dequeued packet
             if (HAL_CAN_AddTxMessage(hcan, &packet.header, packet.data, &free_mailbox) != HAL_OK) {
                 // Transmission failed, re-enqueue the packet
-                enqueue_packet(&packet);
+            	add_packet_to_front_of_queue(&packet);
                 break;
             }
         } else {
         	// no mail box free/no packets
+        	add_packet_to_front_of_queue(&packet);
+            break;
         }
     }
 }
