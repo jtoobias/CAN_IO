@@ -10,6 +10,7 @@
 // Variables
 // Define the global instance of hardware_t
 hardware_t hardware;
+eeprom_storage_t eeprom_storage;
 volatile uint32_t ms_timer = 0;
 
 // Functions
@@ -18,6 +19,12 @@ volatile uint32_t ms_timer = 0;
 void hardware_init(CAN_HandleTypeDef *can_handler,SPI_HandleTypeDef *hSPI){
 	can_init(can_handler);
 	ICM42670P_init(hSPI);
+    EE_Init(&eeprom_storage,sizeof(eeprom_storage));
+}
+
+// This requires the EE_Write() to be called still
+void update_can_ee_pdo_config(pdo_t *ee_pdo,pdo_t *pdo,int pdo_size){
+	memcpy(ee_pdo,pdo,pdo_size);
 }
 
 // Used to poll hardware

@@ -35,8 +35,58 @@
 #define ID_OBJECT_PRODUCT_CODE_OD	0x02
 #define ID_OBJECT_REVISION_NUM_OD	0x03
 
+// RPDO Communication Parameters
+#define RPDO1_COMM_PARAM      0x1400
+#define RPDO2_COMM_PARAM      0x1401
+#define RPDO3_COMM_PARAM      0x1402
+#define RPDO4_COMM_PARAM      0x1403
+
+// TPDO Communication Parameters
+#define TPDO1_COMM_PARAM      0x1800
+#define TPDO2_COMM_PARAM      0x1801
+#define TPDO3_COMM_PARAM      0x1802
+#define TPDO4_COMM_PARAM      0x1803
+
+#define PDO_COMM_PARAM_COB_ID_SUBINDEX   		0x01
+#define PDO_COMM_PARAM_TRANS_TYPE_SUBINDEX 		0x02
+#define PDO_COMM_PARAM_INHIBIT_TIME_SUBINDEX 	0x03
+#define PDO_COMM_PARAM_RESERVED_SUBINDEX 		0x04
+#define PDO_COMM_PARAM_EVENT_TIMER_SUBINDEX 	0x05
+
+// RPDO Mapping Parameters
+#define RPDO1_MAPPING_PARAM   0x1600
+#define RPDO2_MAPPING_PARAM   0x1601
+#define RPDO3_MAPPING_PARAM   0x1602
+#define RPDO4_MAPPING_PARAM   0x1603
+
+// TPDO Mapping Parameters
+#define TPDO1_MAPPING_PARAM   0x1A00
+#define TPDO2_MAPPING_PARAM   0x1A01
+#define TPDO3_MAPPING_PARAM   0x1A02
+#define TPDO4_MAPPING_PARAM   0x1A03
+
+#define PDO_MAPPING_PARAM_NUM_ENTRIES 0x00 // Subindex for number of entries
+#define PDO_MAPPING_PARAM_ENTRY_1     0x01 // Subindex for first entry
+#define PDO_MAPPING_PARAM_ENTRY_2     0x02 // Subindex for second entry
+#define PDO_MAPPING_PARAM_ENTRY_3     0x03 // Subindex for third entry
+#define PDO_MAPPING_PARAM_ENTRY_4     0x04 // Subindex for fourth entry
+#define PDO_MAPPING_PARAM_ENTRY_5     0x05 // Subindex for fifth entry
+#define PDO_MAPPING_PARAM_ENTRY_6     0x06 // Subindex for sixth entry
+#define PDO_MAPPING_PARAM_ENTRY_7     0x07 // Subindex for seventh entry
+#define PDO_MAPPING_PARAM_ENTRY_8     0x08 // Subindex for eighth entry
+
+
+
 #define INPUT_INDEX_OD			0x6000
-#define INPUT_SUBINDEX_OD		0x00
+#define INPUT_ALL_SUBINDEX_OD	0x00
+#define INPUT_1_SUBINDEX_OD		0x01
+#define INPUT_2_SUBINDEX_OD		0x02
+#define INPUT_3_SUBINDEX_OD		0x03
+#define INPUT_4_SUBINDEX_OD		0x04
+#define INPUT_5_SUBINDEX_OD		0x05
+#define INPUT_6_SUBINDEX_OD		0x06
+#define INPUT_7_SUBINDEX_OD		0x07
+#define INPUT_8_SUBINDEX_OD		0x08
 #define OUTPUT_INDEX_OD			0x6200
 #define OUTPUT_SUBINDEX_OD		0x00
 
@@ -133,15 +183,11 @@
 //• 60 hex Data sent successfully.
 //• 80 hex Error.
 
-#define PDO_MODE_OFF			0x00
-#define PDO_MODE_ON				0x01
-
 #define PDO_MODE_SYNC_INDEX			0x00
 #define PDO_MODE_EVENT_INDEX		0x01
 #define PDO_MODE_CYCLIC_INDEX		0x02
 #define PDO_MODE_RTR_INDEX			0x03
 
-#define PDO_TRIGGER_OFF				0x00
 #define PDO_TRIGGER_LOW_TO_HIGH		0x01
 #define PDO_TRIGGER_HIGH_TO_LOW		0x02
 #define PDO_TRIGGER_BOTH			0x03
@@ -149,6 +195,21 @@
 #define PDO_NUMBER_OF_ANALOG_TRIGGERS		6		// 6 analog
 #define PDO_NUMBER_OF_DIGITAL_TRIGGERS		8		// 6 analog
 #define PDO_NUMBER_OF_TRIGGERS		PDO_NUMBER_OF_ANALOG_TRIGGERS+PDO_NUMBER_OF_DIGITAL_TRIGGERS		// 8 digital i/o , 6 analog
+
+#define TRIGGER_INDEX_DIN_1			0
+#define TRIGGER_INDEX_DIN_2			1
+#define TRIGGER_INDEX_DIN_3			2
+#define TRIGGER_INDEX_DIN_4			3
+#define TRIGGER_INDEX_DIN_5			4
+#define TRIGGER_INDEX_DIN_6			5
+#define TRIGGER_INDEX_DIN_7			6
+#define TRIGGER_INDEX_DIN_8			7
+#define TRIGGER_INDEX_GYRO_X		8
+#define TRIGGER_INDEX_GYRO_Y		9
+#define TRIGGER_INDEX_GYRO_Z		10
+#define TRIGGER_INDEX_ACCEL_X		11
+#define TRIGGER_INDEX_ACCEL_Y		12
+#define TRIGGER_INDEX_ACCEL_Z		13
 
 #define PDO_NUMBER_OF_BYTES_0		0x00
 #define PDO_NUMBER_OF_BYTES_1		0x01
@@ -168,40 +229,25 @@ typedef struct {
     volatile uint16_t tail;
 } CircularBuffer;
 
-// PDO mapping can be done by receiving indices which will be used to map the variables to the correct pdo
-typedef struct {
-	uint16_t _func_code;					// Don't edit this
+
+// 56 Bytes
+typedef struct{
+	uint32_t _cob_id;						// Don't edit this
 	uint32_t inhibit_time;					// time in ms: This block sends of the pdo until the time has elapsed
 	uint32_t last_send_time;				// time in ms: The last time the pdo was sent
-
-	void* payload[8];						// This points the the variables that are sent or received in the pdo
 	uint8_t number_of_bytes[8]; 			// This holds the number of bytes for each of the payload variables
-											// (0=undefined,1=int8,2=int16,3=int32)
+												// (0=undefined,1=int8,2=int16,3=int32)
 	uint32_t mapped_indices[8]; 			// This holds the OD indices of the mapped variables: Used to know the contents of the payload
 
 	union{
 		struct{
-			uint8_t sync_mode_val;
-			union{
-				struct{
-					uint8_t bit0		:1;
-					uint8_t bit1		:1;
-					uint8_t bit2		:1;
-					uint8_t bit3		:1;
-					uint8_t bit4		:1;
-					uint8_t bit5		:1;
-					uint8_t bit6		:1;
-					uint8_t bit7		:1;
-				}event_mode;
-				uint8_t event_mode_val;
-			};
+			uint8_t sync_mode_val;			// Stores the amount of syncs before a send is required
+			uint8_t event_mode_val;			// True or False for if there are mapped indices.
 			uint8_t cyclic_mode;					// This is meant to be part of event mode, but having its own flag makes it easier
 			uint8_t request_mode_val;
 		};
 		uint8_t mode[4];							// PDO mode (sync[0], event[1],cyclic[2], Request[3])
 	};
-
-
 
 	uint32_t transmit_period;					// If event mode and a transmit period is set: (0 is OFF)
 
@@ -209,6 +255,15 @@ typedef struct {
 												// 0=Off, 1=low->high, 2=high->low, 3=both, (This array is in order. DIO 1->8,xyzGyro,xyzAccel)
 
 	int16_t analog_thresholds[PDO_NUMBER_OF_ANALOG_TRIGGERS];				// Thresholds for analog trigger
+
+}pdo_config_t;
+
+// PDO mapping can be done by receiving indices which will be used to map the variables to the correct pdo
+typedef struct {
+
+
+	void* payload[8];						// This points the the variables that are sent or received in the pdo
+	pdo_config_t config;
 
 }pdo_t;
 
@@ -278,7 +333,8 @@ extern can_t can;
 
 void can_init(CAN_HandleTypeDef *can_handler);
 void setup_CAN_cfg(void);
-void init_pdo(uint32_t func_code,pdo_t *pdo);
+void insert_sorted(uint8_t *array, uint8_t *current_size, uint8_t arr_size, uint8_t value);
+void init_pdo(uint32_t func_code,pdo_t *pdo,pdo_t *ee_pdo);
 void send_pdo(pdo_t *pdo);
 void send_cyclic_pdo(pdo_t* pdo);
 int8_t pdo_sync_output_check_and_update(pdo_t* rpdo);
@@ -296,6 +352,6 @@ int enqueue_packet(CAN_Packet *packet);
 int add_packet_to_front_of_queue(CAN_Packet *packet);
 int dequeue_packet(CAN_Packet *packet);
 void CAN_TxHandler(CAN_HandleTypeDef *hcan);
-int8_t send_can_packet(uint32_t func_code,uint8_t *data,uint32_t data_len);
+int8_t send_can_packet(uint32_t cob_id,uint8_t *data,uint32_t data_len);
 
 #endif /* INC_CAN_MANAGER_H_ */

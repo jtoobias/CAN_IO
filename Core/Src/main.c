@@ -23,7 +23,6 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "hardware.h"
-
 #include "usbd_cdc_if.h"
 #include "string.h"
 /* USER CODE END Includes */
@@ -149,6 +148,9 @@ int main(void)
 	  // Handle pdo send on sync (T) Tested
 	  // handle pdo on input change (T)
 	  // handle pdo on threshold trigger
+
+	  // EEPROM;
+	  // For each PDO store mapped indices and bytes per index
 
 	  send_cyclic_pdo(&can.tpdo1);
 
