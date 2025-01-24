@@ -123,50 +123,6 @@ void init_pdo(uint32_t func_code,pdo_t *pdo,pdo_t *ee_pdo){
 }
 
 
-void send_pdo(pdo_t *pdo){
-	uint8_t tx_buffer[8] = {0};
-	uint8_t i = 0, payload_size = 0;
-		// Don't send if the time since last send is less than the inhibit period
-	if (diff_ms_timer(pdo->config.last_send_time) < pdo->config.inhibit_time)return;
-	// loop through the bytes
-	for (i = 0; i < sizeof(pdo->config.number_of_bytes);i++){
-		// exit if variable is not setup
-		if (pdo->config.number_of_bytes[i] == 0) break;
-			// Add variable to the array
-		switch (pdo->config.number_of_bytes[i]){
-			case 1:
-				tx_buffer[payload_size] = *(int8_t*)pdo->payload[i];
-				payload_size ++;
-				break;
-			case 2:
-				*(int16_t*)&tx_buffer[payload_size] = *(int16_t*)pdo->payload[i];
-				payload_size += 2;
-				break;
-			case 3:
-				*(int32_t*)&tx_buffer[payload_size] = *(int32_t*)pdo->payload[i];
-				payload_size += 4;
-				break;
-			default:
-				// incorrect type
-				break;
-		}
-	}
-	send_can_packet(pdo->config._cob_id,&tx_buffer[0],payload_size);
-	pdo->config.last_send_time = get_ms_timer();
-}
-
-	// Given look at all pdo's, check if interval period is set and send if required
-void send_cyclic_pdo(pdo_t* pdo){
-		// Enabled?
-	if (pdo->config.transmit_period > 0 && pdo->config.cyclic_mode == TRUE){
-			// Check if ready to send
-		if (diff_ms_timer(pdo->config.last_send_time) >= pdo->config.transmit_period){
-			send_pdo(pdo);
-		}
-	}
-}
-
-
 int8_t pdo_input_check_wrapper(uint8_t input_index, uint8_t new_val){
 	int8_t debug_status = FALSE;
 	// First check if a PDO is triggered from this input
@@ -211,6 +167,96 @@ int8_t pdo_input_check_and_send(pdo_t* tpdo,uint8_t input_index,uint8_t new_val)
 	return FALSE;
 }
 
+
+
+void can_state_manager(void){
+// NODE CONNECTIONS
+// init -> preoperational
+// preoperational -> operational
+// Preoerational -> Stopped
+// Preoperational -> Init (two ways (reset, and comms reset)
+// Operational -> stopped
+// Operational -> preoperational
+// Operational -> Init (two ways (reset, and comms reset)
+
+	// Check current states and see requierd action to get to the next state
+	switch (can.state){
+		case CAN_STATE_INIT:
+
+			can.state = CAN_STATE_PREOPERATIONAL;
+			can.target_state = CAN_STATE_PREOPERATIONAL;
+			HAL_CAN_Stop(can.handler);
+			setup_CAN_cfg();
+			HAL_CAN_Start(can.handler);
+			HAL_CAN_ActivateNotification(can.handler,CAN_IT_RX_FIFO1_MSG_PENDING);
+
+			uint8_t tmp_arr = 0x00;
+			send_can_packet(HEARTBEAT,&tmp_arr,1);
+			break;
+		case CAN_STATE_PREOPERATIONAL:
+			if (can.target_state == CAN_STATE_OPERATIONAL) can.state = CAN_STATE_OPERATIONAL;
+		case CAN_STATE_OPERATIONAL:
+			if (can.target_state == CAN_STATE_PREOPERATIONAL &&
+				can.state == CAN_STATE_OPERATIONAL) {
+				can.state = CAN_STATE_PREOPERATIONAL;
+
+			} else if (can.target_state == CAN_STATE_INIT) {
+				can.state = CAN_STATE_INIT;
+			} else if (can.target_state == CAN_STATE_STOPPED) {
+				can.state = CAN_STATE_STOPPED;
+			}
+			break;
+		case CAN_STATE_STOPPED:
+			if (can.target_state == CAN_STATE_PREOPERATIONAL) {
+				can.state = CAN_STATE_PREOPERATIONAL;
+			} else if (can.target_state == CAN_STATE_OPERATIONAL) {
+				can.state = CAN_STATE_OPERATIONAL;
+			} else if (can.target_state == CAN_STATE_INIT) {
+				can.state = CAN_STATE_INIT;
+			}
+			break;
+		default:
+			//problem
+			break;
+	}
+}
+
+
+//void update outputs from CAN PDO sync
+int8_t pdo_sync_output_check_and_update(pdo_t* rpdo){
+	// For output based RPDOs first set the outputs before updating the variables.
+	// This makes sure all devices are sync'd on the following sync call
+	//check if sync mode is active
+	if (rpdo->config.sync_mode_val == FALSE){
+		return FALSE;
+	} else {
+		// check mapping for output control
+		for (int i = 0; i<sizeof(rpdo->config.mapped_indices); i++){
+			if (rpdo->config.mapped_indices[i] == (OUTPUT_INDEX_OD<<8|OUTPUT_SUBINDEX_OD)){
+				// Output is controlled by this pdo
+				set_outputs();
+				switch (rpdo->config.number_of_bytes[i]){
+					case PDO_NUMBER_OF_BYTES_1:
+						// update output variables from the payload
+						hardware.output_value = (*(uint8_t*)rpdo->payload[i] & 0x00FF);
+						break;
+					case PDO_NUMBER_OF_BYTES_2:
+						// update output variables from the payload
+						hardware.output_value = (*(uint16_t*)rpdo->payload[i] & 0xFFFF);
+						break;
+					default:
+						// Problems wrong type
+						return UNKNOWN;
+						break;
+
+				}
+				return TRUE;
+			}
+		}
+	}
+	return FALSE;
+}
+
 // Function to insert a value into a sorted array
 void insert_sorted(uint8_t *array, uint8_t *current_size, uint8_t arr_size, uint8_t value) {
     // If the array is full, truncate the last element
@@ -230,6 +276,277 @@ void insert_sorted(uint8_t *array, uint8_t *current_size, uint8_t arr_size, uint
 
     // Increment the current size of the array
     (*current_size)++;
+}
+
+
+
+/*************************
+ * CAN Send packet management
+ *************************/
+// Check if the buffer is full
+int is_buffer_full() {
+    return ((can.tx_buffer.head + 1) % CAN_TX_BUFFER_SIZE) == can.tx_buffer.tail;
+}
+
+// Check if the buffer is empty
+int is_buffer_empty() {
+    return can.tx_buffer.head == can.tx_buffer.tail;
+}
+
+// Add a packet to the buffer
+int enqueue_packet(CAN_Packet *packet) {
+    if (is_buffer_full()) {
+        return FALSE; // Buffer full, drop the packet
+    }
+    	// Add to queue
+    can.tx_buffer.buffer[can.tx_buffer.head] = *packet;
+    	// increment head index and manage wrap around
+    can.tx_buffer.head = (can.tx_buffer.head + 1) % CAN_TX_BUFFER_SIZE;
+    return TRUE;
+}
+
+// Add a packet to the buffer
+int add_packet_to_front_of_queue(CAN_Packet *packet) {
+    if (is_buffer_full()) {
+        return FALSE; // Buffer full, drop the packet
+    }
+
+	// Increment and manager wrap around of buffer
+    can.tx_buffer.tail = (can.tx_buffer.tail - 1 + CAN_TX_BUFFER_SIZE) % CAN_TX_BUFFER_SIZE;
+    	// Add to
+    can.tx_buffer.buffer[can.tx_buffer.tail] = *packet;
+    return TRUE;
+}
+
+// Retrieve a packet from the buffer
+int dequeue_packet(CAN_Packet *packet) {
+    if (is_buffer_empty()) {
+        return FALSE; // Buffer empty
+    }
+    *packet = can.tx_buffer.buffer[can.tx_buffer.tail];
+    	// Increment and manager wrap around of buffer
+    can.tx_buffer.tail = (can.tx_buffer.tail + 1) % CAN_TX_BUFFER_SIZE;
+    return TRUE;
+}
+
+// Transmit packets from the buffer
+void CAN_TxHandler(CAN_HandleTypeDef *hcan) {
+    CAN_Packet packet;
+
+    // Try to transmit while mailboxes are available and buffer is not empty
+    while (!is_buffer_empty()) {
+        uint32_t free_mailbox;
+        // Mailbox free? and message being sent? and are there packets to send?
+        if (HAL_CAN_GetTxMailboxesFreeLevel(hcan) > 0 &&
+            dequeue_packet(&packet) == TRUE) {
+            // Attempt to transmit the dequeued packet
+            if (HAL_CAN_AddTxMessage(hcan, &packet.header, packet.data, &free_mailbox) != HAL_OK) {
+                // Transmission failed, re-enqueue the packet
+            	add_packet_to_front_of_queue(&packet);
+                break;
+            }
+        } else {
+        	// no mail box free/no packets
+        	add_packet_to_front_of_queue(&packet);
+            break;
+        }
+    }
+}
+
+// Handle Mailbox 0 Complete
+void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan) {
+    CAN_TxHandler(hcan);
+}
+
+// Handle Mailbox 1 Complete
+void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan) {
+    CAN_TxHandler(hcan);
+}
+
+// Handle Mailbox 2 Complete
+void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan) {
+    CAN_TxHandler(hcan);
+}
+
+// Function to queue a packet for transmission
+int8_t send_can_packet(uint32_t cob_id,uint8_t *data,uint32_t data_len){
+
+    CAN_Packet packet;
+    packet.header.DLC = data_len;
+	packet.header.ExtId = 0;
+	packet.header.IDE = CAN_ID_STD;
+	packet.header.RTR = CAN_RTR_DATA;
+	packet.header.StdId = cob_id; // func_code | can.id_u.id_value
+	packet.header.TransmitGlobalTime = DISABLE;
+
+	// Copy over data
+    memcpy(packet.data, data, data_len);
+
+    // Enqueue the packet
+    if (enqueue_packet(&packet) == FALSE) {
+        return FALSE; // Buffer full
+    }
+    // Trigger transmission if a mailbox is available
+    CAN_TxHandler(can.handler);
+    return TRUE;
+}
+
+void send_pdo(pdo_t *pdo){
+	uint8_t tx_buffer[8] = {0};
+	uint8_t i = 0, payload_size = 0;
+		// Don't send if the time since last send is less than the inhibit period
+	if (diff_ms_timer(pdo->config.last_send_time) < pdo->config.inhibit_time)return;
+	// loop through the bytes
+	for (i = 0; i < sizeof(pdo->config.number_of_bytes);i++){
+		// exit if variable is not setup
+		if (pdo->config.number_of_bytes[i] == 0) break;
+			// Add variable to the array
+		switch (pdo->config.number_of_bytes[i]){
+			case 1:
+				tx_buffer[payload_size] = *(int8_t*)pdo->payload[i];
+				payload_size ++;
+				break;
+			case 2:
+				*(int16_t*)&tx_buffer[payload_size] = *(int16_t*)pdo->payload[i];
+				payload_size += 2;
+				break;
+			case 3:
+				*(int32_t*)&tx_buffer[payload_size] = *(int32_t*)pdo->payload[i];
+				payload_size += 4;
+				break;
+			default:
+				// incorrect type
+				break;
+		}
+	}
+	send_can_packet(pdo->config._cob_id,&tx_buffer[0],payload_size);
+	pdo->config.last_send_time = get_ms_timer();
+}
+
+	// Given look at all pdo's, check if interval period is set and send if required
+void send_cyclic_pdo(pdo_t* pdo){
+		// Enabled?
+	if (pdo->config.transmit_period > 0 && pdo->config.cyclic_mode == TRUE){
+			// Check if ready to send
+		if (diff_ms_timer(pdo->config.last_send_time) >= pdo->config.transmit_period){
+			send_pdo(pdo);
+		}
+	}
+}
+
+
+/*****************************
+ * PACKET HANDLERS
+ *****************************/
+
+//	Manage CAN messages here, build packet handler
+void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *can_handler){
+//    HAL_GPIO_TogglePin(OUT0_GPIO_Port, OUT0_Pin); // Example debug pin
+    if (HAL_CAN_GetRxMessage(can_handler, CAN_RX_FIFO1, &can.rx_header, can.rx_data_buffer) == HAL_OK) {
+        // Process the received message
+    	int can_id = (can.rx_header.StdId & 0x07F);
+		// Check COB-ID
+    	int cob_id = (can.rx_header.StdId & 0x780);
+
+    	if (cob_id == NMT_COB_ID) {
+    		nmt_handler(can.rx_data_buffer,can.rx_header.DLC);
+    		return;
+    	} else if (can_id != can.id_u.id_value){
+    		if (cob_id == SYNC_COB_ID && can.state == CAN_STATE_OPERATIONAL) sync_handler();
+    		return;
+    	}
+    	if (can_id != can.id_u.id_value) return;
+    	if (can.state != CAN_STATE_PREOPERATIONAL &&
+    		can.state != CAN_STATE_OPERATIONAL) return;
+//    	can.rx_header.DLC
+    	switch (cob_id){
+			case RPDO1:
+					// PDO's only work in Operational state
+		    	if (can.state != CAN_STATE_OPERATIONAL) break;
+
+				break;
+
+			case RPDO2:
+		    	if (can.state != CAN_STATE_OPERATIONAL) break;
+
+				break;
+
+			case RPDO3:
+		    	if (can.state != CAN_STATE_OPERATIONAL) break;
+
+				break;
+
+			case RPDO4:
+		    	if (can.state != CAN_STATE_OPERATIONAL) break;
+
+				break;
+
+    		case RSDO:
+    			sdo_handler(can.rx_data_buffer,can.rx_header.DLC);
+    			break;
+
+    		case HEARTBEAT:
+    			// nothing
+    			break;
+
+    		default:
+//    			printf("[ERROR] Unknown COB-ID %d",cob_id);
+    			break;
+    	}
+    }
+}
+
+void nmt_handler(uint8_t *packet,uint32_t len){
+	// Handle device state
+		// make sure the nmt is for us
+	if (*(packet+1) != can.id_u.id_value) return;
+	uint8_t cmd = *packet;
+
+	// Actual transitions are handled in another state machine to make sure the correct steps are executed
+	switch (cmd){
+		case NMT_START:
+			can.target_state = CAN_STATE_OPERATIONAL;
+			break;
+		case NMT_STOP:
+			can.target_state = CAN_STATE_STOPPED;
+			break;
+		case NMT_PREOPERATIONAL:
+			can.target_state = CAN_STATE_PREOPERATIONAL;
+			break;
+		case NMT_RESET_NODE:
+			reboot_device();
+			break;
+		case NMT_RESET_COMMS:
+			// Call Can setup and update PDO's from eeprom
+			can.target_state = CAN_STATE_INIT;
+			break;
+	}
+}
+
+// Likely need to handle multiple sends (likely require a global transmit buffer that feeds the CAN FIFO when there is space)
+void sync_handler(void){
+	// Place holder for now (if PDO is configured for Sync it will trigger sends and loads here)
+	if (can.tpdo1.config.sync_mode_val == TRUE){
+		send_pdo(&can.tpdo1);
+	}
+
+	if (can.tpdo2.config.sync_mode_val == TRUE){
+		send_pdo(&can.tpdo2);
+	}
+
+	if (can.tpdo3.config.sync_mode_val == TRUE){
+		send_pdo(&can.tpdo3);
+	}
+
+	if (can.tpdo4.config.sync_mode_val == TRUE){
+		send_pdo(&can.tpdo4);
+	}
+
+	// Handle RPDOs:
+	pdo_sync_output_check_and_update(&can.rpdo1);
+	pdo_sync_output_check_and_update(&can.rpdo2);
+	pdo_sync_output_check_and_update(&can.rpdo3);
+	pdo_sync_output_check_and_update(&can.rpdo4);
 }
 
 void sdo_handler(uint8_t *packet,uint32_t len){
@@ -581,314 +898,4 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 
 	// Send response if required
 	if (response_len != 0) send_can_packet((TSDO|can.id_u.id_value),response,response_len);
-}
-
-
-void can_state_manager(void){
-// NODE CONNECTIONS
-// init -> preoperational
-// preoperational -> operational
-// Preoerational -> Stopped
-// Preoperational -> Init (two ways (reset, and comms reset)
-// Operational -> stopped
-// Operational -> preoperational
-// Operational -> Init (two ways (reset, and comms reset)
-
-	// Check current states and see requierd action to get to the next state
-	switch (can.state){
-		case CAN_STATE_INIT:
-
-			can.state = CAN_STATE_PREOPERATIONAL;
-			can.target_state = CAN_STATE_PREOPERATIONAL;
-			HAL_CAN_Stop(can.handler);
-			setup_CAN_cfg();
-			HAL_CAN_Start(can.handler);
-			HAL_CAN_ActivateNotification(can.handler,CAN_IT_RX_FIFO1_MSG_PENDING);
-
-			uint8_t tmp_arr = 0x00;
-			send_can_packet(HEARTBEAT,&tmp_arr,1);
-			break;
-		case CAN_STATE_PREOPERATIONAL:
-			if (can.target_state == CAN_STATE_OPERATIONAL) can.state = CAN_STATE_OPERATIONAL;
-		case CAN_STATE_OPERATIONAL:
-			if (can.target_state == CAN_STATE_PREOPERATIONAL &&
-				can.state == CAN_STATE_OPERATIONAL) {
-				can.state = CAN_STATE_PREOPERATIONAL;
-
-			} else if (can.target_state == CAN_STATE_INIT) {
-				can.state = CAN_STATE_INIT;
-			} else if (can.target_state == CAN_STATE_STOPPED) {
-				can.state = CAN_STATE_STOPPED;
-			}
-			break;
-		case CAN_STATE_STOPPED:
-			if (can.target_state == CAN_STATE_PREOPERATIONAL) {
-				can.state = CAN_STATE_PREOPERATIONAL;
-			} else if (can.target_state == CAN_STATE_OPERATIONAL) {
-				can.state = CAN_STATE_OPERATIONAL;
-			} else if (can.target_state == CAN_STATE_INIT) {
-				can.state = CAN_STATE_INIT;
-			}
-			break;
-		default:
-			//problem
-			break;
-	}
-}
-
-void nmt_handler(uint8_t *packet,uint32_t len){
-	// Handle device state
-		// make sure the nmt is for us
-	if (*(packet+1) != can.id_u.id_value) return;
-	uint8_t cmd = *packet;
-
-	// Actual transitions are handled in another state machine to make sure the correct steps are executed
-	switch (cmd){
-		case NMT_START:
-			can.target_state = CAN_STATE_OPERATIONAL;
-			break;
-		case NMT_STOP:
-			can.target_state = CAN_STATE_STOPPED;
-			break;
-		case NMT_PREOPERATIONAL:
-			can.target_state = CAN_STATE_PREOPERATIONAL;
-			break;
-		case NMT_RESET_NODE:
-			reboot_device();
-			break;
-		case NMT_RESET_COMMS:
-			// Call Can setup and update PDO's from eeprom
-			can.target_state = CAN_STATE_INIT;
-			break;
-	}
-}
-
-// Likely need to handle multiple sends (likely require a global transmit buffer that feeds the CAN FIFO when there is space)
-void sync_handler(void){
-	// Place holder for now (if PDO is configured for Sync it will trigger sends and loads here)
-	if (can.tpdo1.config.sync_mode_val == TRUE){
-		send_pdo(&can.tpdo1);
-	}
-
-	if (can.tpdo2.config.sync_mode_val == TRUE){
-		send_pdo(&can.tpdo2);
-	}
-
-	if (can.tpdo3.config.sync_mode_val == TRUE){
-		send_pdo(&can.tpdo3);
-	}
-
-	if (can.tpdo4.config.sync_mode_val == TRUE){
-		send_pdo(&can.tpdo4);
-	}
-
-	// Handle RPDOs:
-	pdo_sync_output_check_and_update(&can.rpdo1);
-	pdo_sync_output_check_and_update(&can.rpdo2);
-	pdo_sync_output_check_and_update(&can.rpdo3);
-	pdo_sync_output_check_and_update(&can.rpdo4);
-}
-
-//void update outputs from CAN PDO sync
-int8_t pdo_sync_output_check_and_update(pdo_t* rpdo){
-	// For output based RPDOs first set the outputs before updating the variables.
-	// This makes sure all devices are sync'd on the following sync call
-	//check if sync mode is active
-	if (rpdo->config.sync_mode_val == FALSE){
-		return FALSE;
-	} else {
-		// check mapping for output control
-		for (int i = 0; i<sizeof(rpdo->config.mapped_indices); i++){
-			if (rpdo->config.mapped_indices[i] == (OUTPUT_INDEX_OD<<8|OUTPUT_SUBINDEX_OD)){
-				// Output is controlled by this pdo
-				set_outputs();
-				switch (rpdo->config.number_of_bytes[i]){
-					case PDO_NUMBER_OF_BYTES_1:
-						// update output variables from the payload
-						hardware.output_value = (*(uint8_t*)rpdo->payload[i] & 0x00FF);
-						break;
-					case PDO_NUMBER_OF_BYTES_2:
-						// update output variables from the payload
-						hardware.output_value = (*(uint16_t*)rpdo->payload[i] & 0xFFFF);
-						break;
-					default:
-						// Problems wrong type
-						return UNKNOWN;
-						break;
-
-				}
-				return TRUE;
-			}
-		}
-	}
-	return FALSE;
-}
-
-//	Manage CAN messages here, build packet handler
-void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *can_handler){
-//    HAL_GPIO_TogglePin(OUT0_GPIO_Port, OUT0_Pin); // Example debug pin
-    if (HAL_CAN_GetRxMessage(can_handler, CAN_RX_FIFO1, &can.rx_header, can.rx_data_buffer) == HAL_OK) {
-        // Process the received message
-    	int can_id = (can.rx_header.StdId & 0x07F);
-		// Check COB-ID
-    	int cob_id = (can.rx_header.StdId & 0x780);
-
-    	if (cob_id == NMT_COB_ID) {
-    		nmt_handler(can.rx_data_buffer,can.rx_header.DLC);
-    		return;
-    	} else if (can_id != can.id_u.id_value){
-    		if (cob_id == SYNC_COB_ID && can.state == CAN_STATE_OPERATIONAL) sync_handler();
-    		return;
-    	}
-    	if (can_id != can.id_u.id_value) return;
-    	if (can.state != CAN_STATE_PREOPERATIONAL &&
-    		can.state != CAN_STATE_OPERATIONAL) return;
-//    	can.rx_header.DLC
-    	switch (cob_id){
-			case RPDO1:
-					// PDO's only work in Operational state
-		    	if (can.state != CAN_STATE_OPERATIONAL) break;
-
-				break;
-
-			case RPDO2:
-		    	if (can.state != CAN_STATE_OPERATIONAL) break;
-
-				break;
-
-			case RPDO3:
-		    	if (can.state != CAN_STATE_OPERATIONAL) break;
-
-				break;
-
-			case RPDO4:
-		    	if (can.state != CAN_STATE_OPERATIONAL) break;
-
-				break;
-
-    		case RSDO:
-    			sdo_handler(can.rx_data_buffer,can.rx_header.DLC);
-    			break;
-
-    		case HEARTBEAT:
-    			// nothing
-    			break;
-
-    		default:
-//    			printf("[ERROR] Unknown COB-ID %d",cob_id);
-    			break;
-    	}
-    }
-}
-
-
-/*
- * CAN packet management
- */
-// Check if the buffer is full
-int is_buffer_full() {
-    return ((can.tx_buffer.head + 1) % CAN_TX_BUFFER_SIZE) == can.tx_buffer.tail;
-}
-
-// Check if the buffer is empty
-int is_buffer_empty() {
-    return can.tx_buffer.head == can.tx_buffer.tail;
-}
-
-// Add a packet to the buffer
-int enqueue_packet(CAN_Packet *packet) {
-    if (is_buffer_full()) {
-        return FALSE; // Buffer full, drop the packet
-    }
-    	// Add to queue
-    can.tx_buffer.buffer[can.tx_buffer.head] = *packet;
-    	// increment head index and manage wrap around
-    can.tx_buffer.head = (can.tx_buffer.head + 1) % CAN_TX_BUFFER_SIZE;
-    return TRUE;
-}
-
-// Add a packet to the buffer
-int add_packet_to_front_of_queue(CAN_Packet *packet) {
-    if (is_buffer_full()) {
-        return FALSE; // Buffer full, drop the packet
-    }
-
-	// Increment and manager wrap around of buffer
-    can.tx_buffer.tail = (can.tx_buffer.tail - 1 + CAN_TX_BUFFER_SIZE) % CAN_TX_BUFFER_SIZE;
-    	// Add to
-    can.tx_buffer.buffer[can.tx_buffer.tail] = *packet;
-    return TRUE;
-}
-
-// Retrieve a packet from the buffer
-int dequeue_packet(CAN_Packet *packet) {
-    if (is_buffer_empty()) {
-        return FALSE; // Buffer empty
-    }
-    *packet = can.tx_buffer.buffer[can.tx_buffer.tail];
-    	// Increment and manager wrap around of buffer
-    can.tx_buffer.tail = (can.tx_buffer.tail + 1) % CAN_TX_BUFFER_SIZE;
-    return TRUE;
-}
-
-// Transmit packets from the buffer
-void CAN_TxHandler(CAN_HandleTypeDef *hcan) {
-    CAN_Packet packet;
-
-    // Try to transmit while mailboxes are available and buffer is not empty
-    while (!is_buffer_empty()) {
-        uint32_t free_mailbox;
-        // Mailbox free? and message being sent? and are there packets to send?
-        if (HAL_CAN_GetTxMailboxesFreeLevel(hcan) > 0 &&
-            dequeue_packet(&packet) == TRUE) {
-            // Attempt to transmit the dequeued packet
-            if (HAL_CAN_AddTxMessage(hcan, &packet.header, packet.data, &free_mailbox) != HAL_OK) {
-                // Transmission failed, re-enqueue the packet
-            	add_packet_to_front_of_queue(&packet);
-                break;
-            }
-        } else {
-        	// no mail box free/no packets
-        	add_packet_to_front_of_queue(&packet);
-            break;
-        }
-    }
-}
-
-// Handle Mailbox 0 Complete
-void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan) {
-    CAN_TxHandler(hcan);
-}
-
-// Handle Mailbox 1 Complete
-void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan) {
-    CAN_TxHandler(hcan);
-}
-
-// Handle Mailbox 2 Complete
-void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan) {
-    CAN_TxHandler(hcan);
-}
-
-// Function to queue a packet for transmission
-int8_t send_can_packet(uint32_t cob_id,uint8_t *data,uint32_t data_len){
-
-    CAN_Packet packet;
-    packet.header.DLC = data_len;
-	packet.header.ExtId = 0;
-	packet.header.IDE = CAN_ID_STD;
-	packet.header.RTR = CAN_RTR_DATA;
-	packet.header.StdId = cob_id; // func_code | can.id_u.id_value
-	packet.header.TransmitGlobalTime = DISABLE;
-
-	// Copy over data
-    memcpy(packet.data, data, data_len);
-
-    // Enqueue the packet
-    if (enqueue_packet(&packet) == FALSE) {
-        return FALSE; // Buffer full
-    }
-    // Trigger transmission if a mailbox is available
-    CAN_TxHandler(can.handler);
-    return TRUE;
 }
