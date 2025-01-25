@@ -98,7 +98,7 @@ void setup_CAN_cfg(void){
 }
 
 // Place holder. This will likely be filled in my eeprom variables
-void init_pdo(uint32_t func_code,pdo_t *pdo,pdo_t *ee_pdo){
+void init_pdo(uint32_t func_code,pdo_t *pdo,pdo_config_t *ee_pdo){
 
 	pdo->config._cob_id = func_code | can.id_u.id_value;
 	memset(pdo->config.number_of_bytes, 0, sizeof(pdo->config.number_of_bytes)); // Set all elements to 0
@@ -578,31 +578,54 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 	if (cmd & 0x20){
 		// Use data length to get data out (set objects)
 		switch (index){
+			case TPDO1_ANALOG_THRESHOLDS_OD:
+			case TPDO2_ANALOG_THRESHOLDS_OD:
+			case TPDO3_ANALOG_THRESHOLDS_OD:
+			case TPDO4_ANALOG_THRESHOLDS_OD:
+				if (index == TPDO1_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo1.config;
+				else if (index == TPDO2_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo2.config;
+				else if (index == TPDO3_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo3.config;
+				else if (index == TPDO4_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo4.config;
+				else break;
+				pdo_config->analog_thresholds[(sub_index-1)] = (int16_t)(data & 0x0000FFFF);
+				break;
 
-			case RPDO1_MAPPING_PARAM:
-			case RPDO2_MAPPING_PARAM:
-			case RPDO3_MAPPING_PARAM:
-			case RPDO4_MAPPING_PARAM:
-			case TPDO1_MAPPING_PARAM:
-			case TPDO2_MAPPING_PARAM:
-			case TPDO3_MAPPING_PARAM:
-			case TPDO4_MAPPING_PARAM:
+			case TPDO1_ANALOG_TRIGGER_DIRS_OD:
+			case TPDO2_ANALOG_TRIGGER_DIRS_OD:
+			case TPDO3_ANALOG_TRIGGER_DIRS_OD:
+			case TPDO4_ANALOG_TRIGGER_DIRS_OD:
+				if (index == TPDO1_ANALOG_TRIGGER_DIRS_OD) pdo_config = &can.tpdo1.config;
+				else if (index == TPDO2_ANALOG_TRIGGER_DIRS_OD) pdo_config = &can.tpdo2.config;
+				else if (index == TPDO3_ANALOG_TRIGGER_DIRS_OD) pdo_config = &can.tpdo3.config;
+				else if (index == TPDO4_ANALOG_TRIGGER_DIRS_OD) pdo_config = &can.tpdo4.config;
+				else break;
+				pdo_config->triggers[(sub_index-1)] = (uint8_t)(data & 0x000000FF);
+				break;
+
+			case RPDO1_MAPPING_PARAM_OD:
+			case RPDO2_MAPPING_PARAM_OD:
+			case RPDO3_MAPPING_PARAM_OD:
+			case RPDO4_MAPPING_PARAM_OD:
+			case TPDO1_MAPPING_PARAM_OD:
+			case TPDO2_MAPPING_PARAM_OD:
+			case TPDO3_MAPPING_PARAM_OD:
+			case TPDO4_MAPPING_PARAM_OD:
 				response[0] = CAN_SERVER_RESPONSE_SUCCESS;
 				*(int16_t*)&response[1] = index;
-				if (index == RPDO1_MAPPING_PARAM) pdo_config = &can.rpdo1.config;
-				else if (index == RPDO2_MAPPING_PARAM) pdo_config = &can.rpdo2.config;
-				else if (index == RPDO3_MAPPING_PARAM) pdo_config = &can.rpdo3.config;
-				else if (index == RPDO4_MAPPING_PARAM) pdo_config = &can.rpdo4.config;
-				else if (index == TPDO1_MAPPING_PARAM) pdo_config = &can.tpdo1.config;
-				else if (index == TPDO2_MAPPING_PARAM) pdo_config = &can.tpdo2.config;
-				else if (index == TPDO3_MAPPING_PARAM) pdo_config = &can.tpdo3.config;
-				else if (index == TPDO4_MAPPING_PARAM) pdo_config = &can.tpdo4.config;
+				if (index == RPDO1_MAPPING_PARAM_OD) pdo_config = &can.rpdo1.config;
+				else if (index == RPDO2_MAPPING_PARAM_OD) pdo_config = &can.rpdo2.config;
+				else if (index == RPDO3_MAPPING_PARAM_OD) pdo_config = &can.rpdo3.config;
+				else if (index == RPDO4_MAPPING_PARAM_OD) pdo_config = &can.rpdo4.config;
+				else if (index == TPDO1_MAPPING_PARAM_OD) pdo_config = &can.tpdo1.config;
+				else if (index == TPDO2_MAPPING_PARAM_OD) pdo_config = &can.tpdo2.config;
+				else if (index == TPDO3_MAPPING_PARAM_OD) pdo_config = &can.tpdo3.config;
+				else if (index == TPDO4_MAPPING_PARAM_OD) pdo_config = &can.tpdo4.config;
 				else break;	// Shouldn't happen
 
 				response[3] = sub_index;
 				response_len = 4;
 				switch (sub_index){
-					case PDO_MAPPING_PARAM_NUM_ENTRIES:
+					case PDO_MAPPING_SUBINDEX_NUM_ENTRIES_OD:
 						// If this is greater than zero, COS is enabled, and is based on the mapped indices
 						if (data > 0) {
 							uint16_t index = 0;
@@ -663,14 +686,14 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 							pdo_config->event_mode_val = DISABLE;
 						}
 						break;
-					case PDO_MAPPING_PARAM_ENTRY_1:
-					case PDO_MAPPING_PARAM_ENTRY_2:
-					case PDO_MAPPING_PARAM_ENTRY_3:
-					case PDO_MAPPING_PARAM_ENTRY_4:
-					case PDO_MAPPING_PARAM_ENTRY_5:
-					case PDO_MAPPING_PARAM_ENTRY_6:
-					case PDO_MAPPING_PARAM_ENTRY_7:
-					case PDO_MAPPING_PARAM_ENTRY_8:
+					case PDO_MAPPING_SUBINDEX_ENTRY_1_OD:
+					case PDO_MAPPING_SUBINDEX_ENTRY_2_OD:
+					case PDO_MAPPING_SUBINDEX_ENTRY_3_OD:
+					case PDO_MAPPING_SUBINDEX_ENTRY_4_OD:
+					case PDO_MAPPING_SUBINDEX_ENTRY_5_OD:
+					case PDO_MAPPING_SUBINDEX_ENTRY_6_OD:
+					case PDO_MAPPING_SUBINDEX_ENTRY_7_OD:
+					case PDO_MAPPING_SUBINDEX_ENTRY_8_OD:
 						// Sub-index used to index the array
 						pdo_config->mapped_indices[(sub_index-1)] = data;
 						break;
@@ -679,34 +702,34 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 						break;
 				}
 				break;
-			case RPDO1_COMM_PARAM:
-			case RPDO2_COMM_PARAM:
-			case RPDO3_COMM_PARAM:
-			case RPDO4_COMM_PARAM:
-			case TPDO1_COMM_PARAM:
-			case TPDO2_COMM_PARAM:
-			case TPDO3_COMM_PARAM:
-			case TPDO4_COMM_PARAM:
+			case RPDO1_COMM_PARAM_OD:
+			case RPDO2_COMM_PARAM_OD:
+			case RPDO3_COMM_PARAM_OD:
+			case RPDO4_COMM_PARAM_OD:
+			case TPDO1_COMM_PARAM_OD:
+			case TPDO2_COMM_PARAM_OD:
+			case TPDO3_COMM_PARAM_OD:
+			case TPDO4_COMM_PARAM_OD:
 				response[0] = CAN_SERVER_RESPONSE_SUCCESS;
 				*(int16_t*)&response[1] = index;
-				if (index == RPDO1_COMM_PARAM) pdo_config = &can.rpdo1.config;
-				else if (index == RPDO2_COMM_PARAM) pdo_config = &can.rpdo2.config;
-				else if (index == RPDO3_COMM_PARAM) pdo_config = &can.rpdo3.config;
-				else if (index == RPDO4_COMM_PARAM) pdo_config = &can.rpdo4.config;
-				else if (index == TPDO1_COMM_PARAM) pdo_config = &can.rpdo2.config;
-				else if (index == TPDO2_COMM_PARAM) pdo_config = &can.rpdo2.config;
-				else if (index == TPDO3_COMM_PARAM) pdo_config = &can.rpdo3.config;
-				else if (index == TPDO4_COMM_PARAM) pdo_config = &can.rpdo4.config;
+				if (index == RPDO1_COMM_PARAM_OD) pdo_config = &can.rpdo1.config;
+				else if (index == RPDO2_COMM_PARAM_OD) pdo_config = &can.rpdo2.config;
+				else if (index == RPDO3_COMM_PARAM_OD) pdo_config = &can.rpdo3.config;
+				else if (index == RPDO4_COMM_PARAM_OD) pdo_config = &can.rpdo4.config;
+				else if (index == TPDO1_COMM_PARAM_OD) pdo_config = &can.tpdo1.config;
+				else if (index == TPDO2_COMM_PARAM_OD) pdo_config = &can.tpdo2.config;
+				else if (index == TPDO3_COMM_PARAM_OD) pdo_config = &can.tpdo3.config;
+				else if (index == TPDO4_COMM_PARAM_OD) pdo_config = &can.tpdo4.config;
 				else break;	// Shouldn't happen
 
 				response_len = 4;
 				response[3] = sub_index;
 				switch (sub_index){
-					case PDO_COMM_PARAM_COB_ID_SUBINDEX:
+					case PDO_COMM_PARAM_COB_ID_SUBINDEX_OD:
 						// Store the cob-id for the PDO to be sent with
 						pdo_config->_cob_id = data;
 						break;
-					case PDO_COMM_PARAM_TRANS_TYPE_SUBINDEX:
+					case PDO_COMM_PARAM_TRANS_TYPE_SUBINDEX_OD:
 						// Synchronous or asynchronouss (value from 0->255) 255 == Async and 0->254 is the amount of Syncs before send
 						if (data == 0xFF) {
 							pdo_config->sync_mode_val = DISABLE;
@@ -716,13 +739,13 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 						}
 						// Need to check the data to see what modes are enabled
 						break;
-					case PDO_COMM_PARAM_INHIBIT_TIME_SUBINDEX:
+					case PDO_COMM_PARAM_INHIBIT_TIME_SUBINDEX_OD:
 						// Store the inhibit time
 						pdo_config->inhibit_time = data;
 						break;
 //					case PDO_COMM_PARAM_RESERVED_SUBINDEX:
 //						break;
-					case PDO_COMM_PARAM_EVENT_TIMER_SUBINDEX:
+					case PDO_COMM_PARAM_EVENT_TIMER_SUBINDEX_OD:
 						// Store the update period
 						pdo_config->transmit_period = data;
 						break;

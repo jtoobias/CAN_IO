@@ -36,45 +36,69 @@
 #define ID_OBJECT_REVISION_NUM_OD	0x03
 
 // RPDO Communication Parameters
-#define RPDO1_COMM_PARAM      0x1400
-#define RPDO2_COMM_PARAM      0x1401
-#define RPDO3_COMM_PARAM      0x1402
-#define RPDO4_COMM_PARAM      0x1403
+#define RPDO1_COMM_PARAM_OD      0x1400
+#define RPDO2_COMM_PARAM_OD      0x1401
+#define RPDO3_COMM_PARAM_OD      0x1402
+#define RPDO4_COMM_PARAM_OD      0x1403
 
 // TPDO Communication Parameters
-#define TPDO1_COMM_PARAM      0x1800
-#define TPDO2_COMM_PARAM      0x1801
-#define TPDO3_COMM_PARAM      0x1802
-#define TPDO4_COMM_PARAM      0x1803
+#define TPDO1_COMM_PARAM_OD      0x1800
+#define TPDO2_COMM_PARAM_OD      0x1801
+#define TPDO3_COMM_PARAM_OD      0x1802
+#define TPDO4_COMM_PARAM_OD      0x1803
 
-#define PDO_COMM_PARAM_COB_ID_SUBINDEX   		0x01
-#define PDO_COMM_PARAM_TRANS_TYPE_SUBINDEX 		0x02
-#define PDO_COMM_PARAM_INHIBIT_TIME_SUBINDEX 	0x03
-#define PDO_COMM_PARAM_RESERVED_SUBINDEX 		0x04
-#define PDO_COMM_PARAM_EVENT_TIMER_SUBINDEX 	0x05
+#define PDO_COMM_PARAM_COB_ID_SUBINDEX_OD   		0x01
+#define PDO_COMM_PARAM_TRANS_TYPE_SUBINDEX_OD 		0x02
+#define PDO_COMM_PARAM_INHIBIT_TIME_SUBINDEX_OD 	0x03
+#define PDO_COMM_PARAM_RESERVED_SUBINDEX_OD 		0x04
+#define PDO_COMM_PARAM_EVENT_TIMER_SUBINDEX_OD	 	0x05
 
 // RPDO Mapping Parameters
-#define RPDO1_MAPPING_PARAM   0x1600
-#define RPDO2_MAPPING_PARAM   0x1601
-#define RPDO3_MAPPING_PARAM   0x1602
-#define RPDO4_MAPPING_PARAM   0x1603
+#define RPDO1_MAPPING_PARAM_OD   0x1600
+#define RPDO2_MAPPING_PARAM_OD   0x1601
+#define RPDO3_MAPPING_PARAM_OD   0x1602
+#define RPDO4_MAPPING_PARAM_OD   0x1603
 
 // TPDO Mapping Parameters
-#define TPDO1_MAPPING_PARAM   0x1A00
-#define TPDO2_MAPPING_PARAM   0x1A01
-#define TPDO3_MAPPING_PARAM   0x1A02
-#define TPDO4_MAPPING_PARAM   0x1A03
+#define TPDO1_MAPPING_PARAM_OD   0x1A00
+#define TPDO2_MAPPING_PARAM_OD   0x1A01
+#define TPDO3_MAPPING_PARAM_OD   0x1A02
+#define TPDO4_MAPPING_PARAM_OD   0x1A03
 
-#define PDO_MAPPING_PARAM_NUM_ENTRIES 0x00 // Subindex for number of entries
-#define PDO_MAPPING_PARAM_ENTRY_1     0x01 // Subindex for first entry
-#define PDO_MAPPING_PARAM_ENTRY_2     0x02 // Subindex for second entry
-#define PDO_MAPPING_PARAM_ENTRY_3     0x03 // Subindex for third entry
-#define PDO_MAPPING_PARAM_ENTRY_4     0x04 // Subindex for fourth entry
-#define PDO_MAPPING_PARAM_ENTRY_5     0x05 // Subindex for fifth entry
-#define PDO_MAPPING_PARAM_ENTRY_6     0x06 // Subindex for sixth entry
-#define PDO_MAPPING_PARAM_ENTRY_7     0x07 // Subindex for seventh entry
-#define PDO_MAPPING_PARAM_ENTRY_8     0x08 // Subindex for eighth entry
+#define PDO_MAPPING_SUBINDEX_NUM_ENTRIES_OD 0x00 // Subindex for number of entries
+#define PDO_MAPPING_SUBINDEX_ENTRY_1_OD     0x01 // Subindex for first entry
+#define PDO_MAPPING_SUBINDEX_ENTRY_2_OD     0x02 // Subindex for second entry
+#define PDO_MAPPING_SUBINDEX_ENTRY_3_OD     0x03 // Subindex for third entry
+#define PDO_MAPPING_SUBINDEX_ENTRY_4_OD     0x04 // Subindex for fourth entry
+#define PDO_MAPPING_SUBINDEX_ENTRY_5_OD     0x05 // Subindex for fifth entry
+#define PDO_MAPPING_SUBINDEX_ENTRY_6_OD     0x06 // Subindex for sixth entry
+#define PDO_MAPPING_SUBINDEX_ENTRY_7_OD     0x07 // Subindex for seventh entry
+#define PDO_MAPPING_SUBINDEX_ENTRY_8_OD     0x08 // Subindex for eighth entry
 
+
+// TPDO1 Analog Thresholds and Trigger Directions
+#define TPDO1_ANALOG_THRESHOLDS_OD    0x2000
+#define TPDO1_ANALOG_TRIGGER_DIRS_OD  0x2001
+
+// TPDO2 Analog Thresholds and Trigger Directions
+#define TPDO2_ANALOG_THRESHOLDS_OD    0x2010
+#define TPDO2_ANALOG_TRIGGER_DIRS_OD  0x2011
+
+// TPDO3 Analog Thresholds and Trigger Directions
+#define TPDO3_ANALOG_THRESHOLDS_OD    0x2020
+#define TPDO3_ANALOG_TRIGGER_DIRS_OD  0x2021
+
+// TPDO4 Analog Thresholds and Trigger Directions
+#define TPDO4_ANALOG_THRESHOLDS_OD    0x2030
+#define TPDO4_ANALOG_TRIGGER_DIRS_OD  0x2031
+
+#define ANALOG_NUMBER_SUBINDEX_OD     0x00
+#define ANALOG_INPUT_1_SUBINDEX_OD    0x01
+#define ANALOG_INPUT_2_SUBINDEX_OD    0x02
+#define ANALOG_INPUT_3_SUBINDEX_OD    0x03
+#define ANALOG_INPUT_4_SUBINDEX_OD    0x04
+#define ANALOG_INPUT_5_SUBINDEX_OD    0x05
+#define ANALOG_INPUT_6_SUBINDEX_OD    0x06
 
 
 #define INPUT_INDEX_OD			0x6000
@@ -243,7 +267,7 @@ typedef struct{
 		struct{
 			uint8_t sync_mode_val;			// Stores the amount of syncs before a send is required
 			uint8_t event_mode_val;			// True or False for if there are mapped indices.
-			uint8_t cyclic_mode;					// This is meant to be part of event mode, but having its own flag makes it easier
+			uint8_t cyclic_mode;			// This is meant to be part of event mode, but having its own flag makes it easier
 			uint8_t request_mode_val;
 		};
 		uint8_t mode[4];							// PDO mode (sync[0], event[1],cyclic[2], Request[3])
@@ -334,7 +358,7 @@ extern can_t can;
 void can_init(CAN_HandleTypeDef *can_handler);
 void setup_CAN_cfg(void);
 void insert_sorted(uint8_t *array, uint8_t *current_size, uint8_t arr_size, uint8_t value);
-void init_pdo(uint32_t func_code,pdo_t *pdo,pdo_t *ee_pdo);
+void init_pdo(uint32_t func_code,pdo_t *pdo,pdo_config_t *ee_pdo);
 void send_pdo(pdo_t *pdo);
 void send_cyclic_pdo(pdo_t* pdo);
 int8_t pdo_sync_output_check_and_update(pdo_t* rpdo);
