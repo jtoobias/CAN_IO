@@ -102,8 +102,8 @@ typedef struct {
 	int16_t gyro_z_conv;		// deg*100/s
 
 
-	int32_t temperature;	// degrees*10
-	int32_t temperature_offset;
+	int16_t temperature;	// degrees*10
+	int16_t temperature_offset;
 
 
 }ICM42670P_t;

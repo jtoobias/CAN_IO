@@ -77,28 +77,44 @@
 
 
 // TPDO1 Analog Thresholds and Trigger Directions
-#define TPDO1_ANALOG_THRESHOLDS_OD    0x2000
-#define TPDO1_ANALOG_TRIGGER_DIRS_OD  0x2001
+#define TPDO1_ANALOG_THRESHOLDS_OD    	0x2000
+#define TPDO1_TRIGGER_DIRS_OD  			0x2001
 
 // TPDO2 Analog Thresholds and Trigger Directions
-#define TPDO2_ANALOG_THRESHOLDS_OD    0x2010
-#define TPDO2_ANALOG_TRIGGER_DIRS_OD  0x2011
+#define TPDO2_ANALOG_THRESHOLDS_OD    	0x2010
+#define TPDO2_TRIGGER_DIRS_OD  			0x2011
 
 // TPDO3 Analog Thresholds and Trigger Directions
-#define TPDO3_ANALOG_THRESHOLDS_OD    0x2020
-#define TPDO3_ANALOG_TRIGGER_DIRS_OD  0x2021
+#define TPDO3_ANALOG_THRESHOLDS_OD   	0x2020
+#define TPDO3_TRIGGER_DIRS_OD  			0x2021
 
 // TPDO4 Analog Thresholds and Trigger Directions
-#define TPDO4_ANALOG_THRESHOLDS_OD    0x2030
-#define TPDO4_ANALOG_TRIGGER_DIRS_OD  0x2031
+#define TPDO4_ANALOG_THRESHOLDS_OD    	0x2030
+#define TPDO4_TRIGGER_DIRS_OD  			0x2031
 
-#define ANALOG_NUMBER_SUBINDEX_OD     0x00
-#define ANALOG_INPUT_1_SUBINDEX_OD    0x01
-#define ANALOG_INPUT_2_SUBINDEX_OD    0x02
-#define ANALOG_INPUT_3_SUBINDEX_OD    0x03
-#define ANALOG_INPUT_4_SUBINDEX_OD    0x04
-#define ANALOG_INPUT_5_SUBINDEX_OD    0x05
-#define ANALOG_INPUT_6_SUBINDEX_OD    0x06
+// Trigger sub_indices
+#define TRIGGER_IN_1_SUBINDEX_OD		0x01
+#define TRIGGER_IN_2_SUBINDEX_OD		0x02
+#define TRIGGER_IN_3_SUBINDEX_OD		0x03
+#define TRIGGER_IN_4_SUBINDEX_OD		0x04
+#define TRIGGER_IN_5_SUBINDEX_OD		0x05
+#define TRIGGER_IN_6_SUBINDEX_OD		0x06
+#define TRIGGER_IN_7_SUBINDEX_OD		0x07
+#define TRIGGER_IN_8_SUBINDEX_OD		0x08
+#define TRIGGER_GYRO_X_SUBINDEX_OD		0x09
+#define TRIGGER_GYRO_Y_SUBINDEX_OD		0x0A
+#define TRIGGER_GYRO_Z_SUBINDEX_OD		0x0B
+#define TRIGGER_ACCEL_X_SUBINDEX_OD		0x0C
+#define TRIGGER_ACCEL_Y_SUBINDEX_OD		0x0D
+#define TRIGGER_ACCEL_Z_SUBINDEX_OD		0x0E
+
+//#define ANALOG_NUMBER_SUBINDEX_OD     0x00
+//#define ANALOG_INPUT_1_SUBINDEX_OD    0x01
+//#define ANALOG_INPUT_2_SUBINDEX_OD    0x02
+//#define ANALOG_INPUT_3_SUBINDEX_OD    0x03
+//#define ANALOG_INPUT_4_SUBINDEX_OD    0x04
+//#define ANALOG_INPUT_5_SUBINDEX_OD    0x05
+//#define ANALOG_INPUT_6_SUBINDEX_OD    0x06
 
 
 #define INPUT_INDEX_OD			0x6000
@@ -212,6 +228,18 @@
 #define PDO_MODE_CYCLIC_INDEX		0x02
 #define PDO_MODE_RTR_INDEX			0x03
 
+/*
+	Transmission Type	Mode	When is PDO Sent?
+	0	Acyclic Synchronous	First SYNC after an event
+	1-240	Cyclic Synchronous	Every X SYNCs (fixed rate)
+	255	Asynchronous (Event-Driven)	Immediately when event occurs
+ */
+#define TRANSMISSION_TYPE_MODE_ACYCLIC	0
+#define TRANSMISSION_TYPE_MODE_SYNC_LOW	1
+#define TRANSMISSION_TYPE_MODE_SYNC_UP	240
+#define TRANSMISSION_TYPE_MODE_EVENT	255
+
+
 #define PDO_TRIGGER_LOW_TO_HIGH		0x01
 #define PDO_TRIGGER_HIGH_TO_LOW		0x02
 #define PDO_TRIGGER_BOTH			0x03
@@ -234,6 +262,13 @@
 #define TRIGGER_INDEX_ACCEL_X		11
 #define TRIGGER_INDEX_ACCEL_Y		12
 #define TRIGGER_INDEX_ACCEL_Z		13
+
+#define ANALOG_THRESHOLD_INDEX_GYRO_X		0
+#define ANALOG_THRESHOLD_INDEX_GYRO_Y		1
+#define ANALOG_THRESHOLD_INDEX_GYRO_Z		2
+#define ANALOG_THRESHOLD_INDEX_ACCEL_X		3
+#define ANALOG_THRESHOLD_INDEX_ACCEL_Y		4
+#define ANALOG_THRESHOLD_INDEX_ACCEL_Z		5
 
 #define PDO_NUMBER_OF_BYTES_0		0x00
 #define PDO_NUMBER_OF_BYTES_1		0x01
@@ -260,12 +295,13 @@ typedef struct{
 	uint32_t inhibit_time;					// time in ms: This block sends of the pdo until the time has elapsed
 	uint32_t last_send_time;				// time in ms: The last time the pdo was sent
 	uint8_t number_of_bytes[8]; 			// This holds the number of bytes for each of the payload variables
-												// (0=undefined,1=int8,2=int16,3=int32)
+											// (0=undefined,1=int8,2=int16,3 or 4=int32)
+	uint8_t total_number_of_bytes;			// Used to know if this pdo is valid or is going to overflow
 	uint32_t mapped_indices[8]; 			// This holds the OD indices of the mapped variables: Used to know the contents of the payload
 
 	union{
 		struct{
-			uint8_t sync_mode_val;			// Stores the amount of syncs before a send is required
+			uint8_t transmission_type;		// Stores the amount of syncs before a send is required and if its in a
 			uint8_t event_mode_val;			// True or False for if there are mapped indices.
 			uint8_t cyclic_mode;			// This is meant to be part of event mode, but having its own flag makes it easier
 			uint8_t request_mode_val;
@@ -287,6 +323,7 @@ typedef struct {
 
 
 	void* payload[8];						// This points the the variables that are sent or received in the pdo
+	int8_t cos_occured;
 	pdo_config_t config;
 
 }pdo_t;
@@ -350,6 +387,14 @@ typedef struct{
 	pdo_t rpdo3;						// This holds the information for the Receive pdo
 	pdo_t rpdo4;						// This holds the information for the Receive pdo
 
+	// Used to see if the threshold is crossed for PDO sends on COS (make sure to set on init to the first readings)
+	int16_t last_gyro_x;
+	int16_t last_gyro_y;
+	int16_t last_gyro_z;
+
+	int16_t last_accel_x;
+	int16_t last_accel_y;
+	int16_t last_accel_z;
 
 }can_t;
 // Declare the global instance of hardware_t
@@ -364,7 +409,11 @@ void send_cyclic_pdo(pdo_t* pdo);
 int8_t pdo_sync_output_check_and_update(pdo_t* rpdo);
 int8_t pdo_input_check_wrapper(uint8_t input_index, uint8_t new_val);
 int8_t pdo_input_check_and_send(pdo_t* tpdo,uint8_t input_index,uint8_t new_val);
-
+int8_t check_analog_low_to_high_trigger(pdo_config_t* tpdo_config,uint8_t trigger_index, uint8_t analog_threshold_index,uint8_t new_val,int16_t last_val);
+int8_t check_analog_high_to_low_trigger(pdo_config_t* tpdo_config,uint8_t trigger_index, uint8_t analog_threshold_index,uint8_t new_val,int16_t last_val);
+int8_t check_pdo_triggered_by_analog(pdo_t* tpdo,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val);
+int8_t check_all_tpdos_for_analgo_trigger(pdo_t* tpdo,can_t* can_ptr,ICM42670P_t *imu_ptr);
+void update_pdo_payload(pdo_t *pdo, uint8_t arr_index);
 void sdo_handler(uint8_t *packet,uint32_t len);
 void nmt_handler(uint8_t *packet,uint32_t len);
 void sync_handler(void);

@@ -152,6 +152,11 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 {
 	if (hspi->Instance == SPI1){
 		ICM42670P_read_imu_DMA_complete();
+		// Check CAN PDO thresholds, and update the last values
+		check_all_tpdos_for_analgo_trigger(&can.tpdo1,&can,&ICM42670P);
+		check_all_tpdos_for_analgo_trigger(&can.tpdo2,&can,&ICM42670P);
+		check_all_tpdos_for_analgo_trigger(&can.tpdo3,&can,&ICM42670P);
+		check_all_tpdos_for_analgo_trigger(&can.tpdo4,&can,&ICM42670P);
 	}
 }
 

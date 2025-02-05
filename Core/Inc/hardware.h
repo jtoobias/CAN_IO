@@ -27,6 +27,8 @@
 #define EEPROM_ADDR_RPDO3	6
 #define EEPROM_ADDR_RPDO4	7
 
+#define CEIL_DIV(x, y) (((x) + (y) - 1) / (y))
+
 
 typedef struct{
 
@@ -62,13 +64,6 @@ typedef struct{
 	uint32_t last_can_state_check_time;
 	uint32_t last_can_msg_time;
 
-	int16_t last_gyro_x;
-	int16_t last_gyro_y;
-	int16_t last_gyro_z;
-
-	int16_t last_accel_x;
-	int16_t last_accel_y;
-	int16_t last_accel_z;
 
 }hardware_t;
 

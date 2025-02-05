@@ -108,18 +108,18 @@ void init_pdo(uint32_t func_code,pdo_t *pdo,pdo_config_t *ee_pdo){
 	memset(pdo->config.mode, DISABLE, sizeof(pdo->config.mode));
 
 	pdo->config.cyclic_mode = DISABLE;
-	pdo->config.sync_mode_val = ENABLE;
+	pdo->config.transmission_type = ENABLE;
 
 	memset(pdo->config.triggers, DISABLE, sizeof(pdo->config.triggers)); // Set all elements to 0
 	memset(pdo->config.analog_thresholds, 0, sizeof(pdo->config.analog_thresholds)); // Set all elements to 0
 
 
-	pdo->payload[0] = (int16_t*)&ICM42670P.accel_x_conv;
-	pdo->payload[1] = (int16_t*)&ICM42670P.accel_y_conv;
-	pdo->payload[2] = (int16_t*)&ICM42670P.accel_z_conv;
-	pdo->config.number_of_bytes[0] = PDO_NUMBER_OF_BYTES_2;
-	pdo->config.number_of_bytes[1] = PDO_NUMBER_OF_BYTES_2;
-	pdo->config.number_of_bytes[2] = PDO_NUMBER_OF_BYTES_2;
+//	pdo->payload[0] = (int16_t*)&ICM42670P.accel_x_conv;
+//	pdo->payload[1] = (int16_t*)&ICM42670P.accel_y_conv;
+//	pdo->payload[2] = (int16_t*)&ICM42670P.accel_z_conv;
+//	pdo->config.number_of_bytes[0] = PDO_NUMBER_OF_BYTES_2;
+//	pdo->config.number_of_bytes[1] = PDO_NUMBER_OF_BYTES_2;
+//	pdo->config.number_of_bytes[2] = PDO_NUMBER_OF_BYTES_2;
 }
 
 
@@ -139,11 +139,31 @@ int8_t pdo_input_check_wrapper(uint8_t input_index, uint8_t new_val){
 
 // Check if the input triggers a PDO send and for what Input transition
 int8_t pdo_input_check_and_send(pdo_t* tpdo,uint8_t input_index,uint8_t new_val){
-
 			// Check if there are mapped registers enabled
 	if (tpdo->config.event_mode_val == DISABLE){
+		// Transmission type is Acyclic
+		if (tpdo->config.transmission_type == 0){
+			if (tpdo->config.triggers[input_index] == PDO_TRIGGER_HIGH_TO_LOW){
+					// High -> Low
+				if ((hardware.input_value & (1<<input_index)) > (new_val)){
+						// Set the flag so next SYNC the PDO is sent
+					tpdo->cos_occured = TRUE;
+					return TRUE;
+				}
+			} else if (tpdo->config.triggers[input_index] == PDO_TRIGGER_LOW_TO_HIGH){
+					// Low -> High
+				if ((hardware.input_value & (1<<input_index)) < (new_val)){
+					tpdo->cos_occured = TRUE;
+					return TRUE;
+				}
+			} else if (tpdo->config.triggers[input_index] == PDO_TRIGGER_BOTH){
+				tpdo->cos_occured = TRUE;
+				return TRUE;
+			}
+		}
 		return FALSE;
 	} else {
+			// Change of State trigger is enabled
 		if (tpdo->config.triggers[input_index] == PDO_TRIGGER_HIGH_TO_LOW){
 				// High -> Low
 			if ((hardware.input_value & (1<<input_index)) > (new_val)){
@@ -165,6 +185,50 @@ int8_t pdo_input_check_and_send(pdo_t* tpdo,uint8_t input_index,uint8_t new_val)
 		}
 	}
 	return FALSE;
+}
+
+int8_t check_analog_low_to_high_trigger(pdo_config_t* tpdo_config,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val){
+
+	if ((tpdo_config->triggers[trigger_index] == PDO_TRIGGER_LOW_TO_HIGH ||
+		tpdo_config->triggers[trigger_index] == PDO_TRIGGER_BOTH) &&
+		(new_val > tpdo_config->analog_thresholds[analog_threshold_index]) &&
+		(last_val <= tpdo_config->analog_thresholds[analog_threshold_index])){
+		return TRUE;
+	}
+	return FALSE;
+}
+
+int8_t check_analog_high_to_low_trigger(pdo_config_t* tpdo_config,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val){
+
+	if ((tpdo_config->triggers[trigger_index] == PDO_TRIGGER_HIGH_TO_LOW ||
+		tpdo_config->triggers[trigger_index] == PDO_TRIGGER_BOTH) &&
+		(new_val < tpdo_config->analog_thresholds[analog_threshold_index]) &&
+		(last_val >= tpdo_config->analog_thresholds[analog_threshold_index])){
+		return TRUE;
+	}
+	return FALSE;
+}
+
+// Manage PDO sends on analog triggers
+int8_t check_pdo_triggered_by_analog(pdo_t* tpdo,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val){
+	/*
+	 * Check if there is a trigger and direction and if the trigger occurs send
+	 */
+
+	if (check_analog_low_to_high_trigger(&tpdo->config,trigger_index,analog_threshold_index,new_val,last_val) ||
+		check_analog_high_to_low_trigger(&tpdo->config,trigger_index,analog_threshold_index,new_val,last_val)){
+		send_pdo(tpdo);
+	}
+}
+
+int8_t check_all_tpdos_for_analgo_trigger(pdo_t* tpdo,can_t* can_ptr,ICM42670P_t *imu_ptr){
+
+	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_X, ANALOG_THRESHOLD_INDEX_GYRO_X, &imu_ptr->gyro_x_conv, &can_ptr->last_gyro_x);
+	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_Y, ANALOG_THRESHOLD_INDEX_GYRO_Y, &imu_ptr->gyro_y_conv, &can_ptr->last_gyro_y);
+	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_Z, ANALOG_THRESHOLD_INDEX_GYRO_Z, &imu_ptr->gyro_z_conv, &can_ptr->last_gyro_z);
+	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_X, ANALOG_THRESHOLD_INDEX_ACCEL_X, &imu_ptr->accel_x_conv, &can_ptr->last_accel_x);
+	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_Y, ANALOG_THRESHOLD_INDEX_ACCEL_Y, &imu_ptr->accel_y_conv, &can_ptr->last_accel_y);
+	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_Z, ANALOG_THRESHOLD_INDEX_ACCEL_Z, &imu_ptr->accel_z_conv, &can_ptr->last_accel_z);
 }
 
 
@@ -227,7 +291,7 @@ int8_t pdo_sync_output_check_and_update(pdo_t* rpdo){
 	// For output based RPDOs first set the outputs before updating the variables.
 	// This makes sure all devices are sync'd on the following sync call
 	//check if sync mode is active
-	if (rpdo->config.sync_mode_val == FALSE){
+	if (rpdo->config.transmission_type == FALSE){
 		return FALSE;
 	} else {
 		// check mapping for output control
@@ -435,6 +499,71 @@ void send_cyclic_pdo(pdo_t* pdo){
 }
 
 
+void update_pdo_payload(pdo_t *pdo, uint8_t arr_index){
+	if (arr_index > 7) return;
+	uint32_t data = pdo->config.mapped_indices[arr_index];
+
+	// Update the number of total bytes
+	pdo->config.total_number_of_bytes -= pdo->config.number_of_bytes[arr_index];
+	pdo->config.number_of_bytes[arr_index] = CEIL_DIV((data & 0x000000FF),8);
+	pdo->config.total_number_of_bytes += pdo->config.number_of_bytes[arr_index];
+
+	if (pdo->config.total_number_of_bytes > 8){
+		// remove this addition and don't update
+		pdo->config.total_number_of_bytes -= pdo->config.number_of_bytes[arr_index];
+		pdo->config.number_of_bytes[arr_index] = 0;
+		pdo->payload[arr_index] = NULL;
+		return;
+	}
+
+	uint16_t od_subindex = (data >> 8) & 0x0000FF;
+	uint16_t od_index = (data >> 16);
+	// Check the mapped register for what data needs to be sent
+	switch (od_index){
+		case INPUT_INDEX_OD:
+			// Only allow the whole input bytes to be sent and not individual bits
+			pdo->payload[arr_index] = (void*)&hardware.input_value;
+			break;
+		case OUTPUT_INDEX_OD:
+			// Only allow the whole output bytes to be sent and not individual bits
+			pdo->payload[arr_index] = (void*)&hardware.output_value;
+			break;
+				// Link temperature data
+		case TEMP_INDEX_OD:
+			pdo->payload[arr_index] = (void*)&ICM42670P.temperature;
+			break;
+				// Link the correct accelerometer data
+		case ACCEL_INDEX_OD:
+			switch (od_subindex){
+				case ACCEL_X_SUBINDEX_OD:
+					pdo->payload[arr_index] = (void*)&ICM42670P.accel_x_conv;
+					break;
+				case ACCEL_Y_SUBINDEX_OD:
+					pdo->payload[arr_index] = (void*)&ICM42670P.accel_y_conv;
+					break;
+				case ACCEL_Z_SUBINDEX_OD:
+					pdo->payload[arr_index] = (void*)&ICM42670P.accel_z_conv;
+					break;
+			}
+			break;
+			// Link the correct gyro data
+		case GYRO_INDEX_OD:
+			switch (od_subindex){
+				case GYRO_X_SUBINDEX_OD:
+					pdo->payload[arr_index] = (void*)&ICM42670P.gyro_x_conv;
+					break;
+				case GYRO_Y_SUBINDEX_OD:
+					pdo->payload[arr_index] = (void*)&ICM42670P.gyro_y_conv;
+					break;
+				case GYRO_Z_SUBINDEX_OD:
+					pdo->payload[arr_index] = (void*)&ICM42670P.gyro_z_conv;
+					break;
+			}
+			break;
+	}
+}
+
+
 /*****************************
  * PACKET HANDLERS
  *****************************/
@@ -525,20 +654,54 @@ void nmt_handler(uint8_t *packet,uint32_t len){
 
 // Likely need to handle multiple sends (likely require a global transmit buffer that feeds the CAN FIFO when there is space)
 void sync_handler(void){
+	static uint8_t tpdo1_count = 0, tpdo2_count = 0, tpdo3_count = 0, tpdo4_count = 0;
 	// Place holder for now (if PDO is configured for Sync it will trigger sends and loads here)
-	if (can.tpdo1.config.sync_mode_val == TRUE){
+	if (can.tpdo1.config.transmission_type >= TRANSMISSION_TYPE_MODE_SYNC_LOW &&
+		can.tpdo1.config.transmission_type <= TRANSMISSION_TYPE_MODE_SYNC_UP){
+		tpdo1_count++;
+		if (tpdo1_count >= can.tpdo1.config.transmission_type){
+			tpdo1_count = 0;
+			send_pdo(&can.tpdo1);
+		}
+		// check if a COS has occurred while in Acyclic mode
+	} else if (can.tpdo1.config.transmission_type == TRANSMISSION_TYPE_MODE_ACYCLIC && can.tpdo1.cos_occured == TRUE){
+		can.tpdo1.cos_occured = FALSE;
 		send_pdo(&can.tpdo1);
 	}
 
-	if (can.tpdo2.config.sync_mode_val == TRUE){
+	if (can.tpdo2.config.transmission_type >= TRANSMISSION_TYPE_MODE_SYNC_LOW &&
+		can.tpdo2.config.transmission_type <= TRANSMISSION_TYPE_MODE_SYNC_UP){
+		tpdo2_count++;
+		if (tpdo2_count >= can.tpdo2.config.transmission_type){
+			tpdo2_count = 0;
+			send_pdo(&can.tpdo2);
+		}// check if a COS has occurred
+	} else if (can.tpdo2.config.transmission_type == TRANSMISSION_TYPE_MODE_ACYCLIC && can.tpdo2.cos_occured == TRUE){
+		can.tpdo2.cos_occured = FALSE;
 		send_pdo(&can.tpdo2);
 	}
 
-	if (can.tpdo3.config.sync_mode_val == TRUE){
+	if (can.tpdo3.config.transmission_type >= TRANSMISSION_TYPE_MODE_SYNC_LOW &&
+		can.tpdo3.config.transmission_type <= TRANSMISSION_TYPE_MODE_SYNC_UP){
+		tpdo3_count++;
+		if (tpdo3_count >= can.tpdo3.config.transmission_type){
+			tpdo3_count = 0;
+			send_pdo(&can.tpdo3);
+		}// check if a COS has occurred
+	} else if (can.tpdo3.config.transmission_type == TRANSMISSION_TYPE_MODE_ACYCLIC && can.tpdo3.cos_occured == TRUE){
+		can.tpdo3.cos_occured = FALSE;
 		send_pdo(&can.tpdo3);
 	}
 
-	if (can.tpdo4.config.sync_mode_val == TRUE){
+	if (can.tpdo4.config.transmission_type >= TRANSMISSION_TYPE_MODE_SYNC_LOW &&
+		can.tpdo4.config.transmission_type <= TRANSMISSION_TYPE_MODE_SYNC_UP){
+		tpdo4_count++;
+		if (tpdo4_count >= can.tpdo4.config.transmission_type){
+			tpdo4_count = 0;
+			send_pdo(&can.tpdo4);
+		}// check if a COS has occurred
+	} else if (can.tpdo4.config.transmission_type == TRANSMISSION_TYPE_MODE_ACYCLIC && can.tpdo4.cos_occured == TRUE){
+		can.tpdo4.cos_occured = FALSE;
 		send_pdo(&can.tpdo4);
 	}
 
@@ -555,6 +718,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 	int16_t index = (*(int16_t*)(packet+1));
 	int8_t sub_index = *(packet+3);
 	int32_t data = 0;
+	len -= 4;
 	switch (len){
 		case 1:
 				//  Handle different data lengths
@@ -568,20 +732,31 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 				//  Handle different data lengths
 			data = *(int32_t*)(packet+4);
 			break;
+		default:
+			// ERROR
+			HAL_Delay(1);
+			return;
+			break;
 	}
 
 	uint8_t response[8];
 	uint32_t response_len = 0;
 	pdo_config_t *pdo_config;
+	pdo_t *pdo;
 
 		// Check for a write operation
 	if (cmd & 0x20){
 		// Use data length to get data out (set objects)
 		switch (index){
+				// Get analog trigger values
 			case TPDO1_ANALOG_THRESHOLDS_OD:
 			case TPDO2_ANALOG_THRESHOLDS_OD:
 			case TPDO3_ANALOG_THRESHOLDS_OD:
 			case TPDO4_ANALOG_THRESHOLDS_OD:
+				response[0] = CAN_SERVER_RESPONSE_SUCCESS;
+				*(int16_t*)&response[1] = index;
+				response[3] = sub_index;
+				response_len = 4;
 				if (index == TPDO1_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo1.config;
 				else if (index == TPDO2_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo2.config;
 				else if (index == TPDO3_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo3.config;
@@ -590,18 +765,29 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 				pdo_config->analog_thresholds[(sub_index-1)] = (int16_t)(data & 0x0000FFFF);
 				break;
 
-			case TPDO1_ANALOG_TRIGGER_DIRS_OD:
-			case TPDO2_ANALOG_TRIGGER_DIRS_OD:
-			case TPDO3_ANALOG_TRIGGER_DIRS_OD:
-			case TPDO4_ANALOG_TRIGGER_DIRS_OD:
-				if (index == TPDO1_ANALOG_TRIGGER_DIRS_OD) pdo_config = &can.tpdo1.config;
-				else if (index == TPDO2_ANALOG_TRIGGER_DIRS_OD) pdo_config = &can.tpdo2.config;
-				else if (index == TPDO3_ANALOG_TRIGGER_DIRS_OD) pdo_config = &can.tpdo3.config;
-				else if (index == TPDO4_ANALOG_TRIGGER_DIRS_OD) pdo_config = &can.tpdo4.config;
+				// Get trigger directions
+			case TPDO1_TRIGGER_DIRS_OD:
+			case TPDO2_TRIGGER_DIRS_OD:
+			case TPDO3_TRIGGER_DIRS_OD:
+			case TPDO4_TRIGGER_DIRS_OD:
+				response[0] = CAN_SERVER_RESPONSE_SUCCESS;
+				*(int16_t*)&response[1] = index;
+				response[3] = sub_index;
+				response_len = 4;
+				if (index == TPDO1_TRIGGER_DIRS_OD) pdo_config = &can.tpdo1.config;
+				else if (index == TPDO2_TRIGGER_DIRS_OD) pdo_config = &can.tpdo2.config;
+				else if (index == TPDO3_TRIGGER_DIRS_OD) pdo_config = &can.tpdo3.config;
+				else if (index == TPDO4_TRIGGER_DIRS_OD) pdo_config = &can.tpdo4.config;
 				else break;
+				if (sub_index == 0x0F){
+					HAL_Delay(1);
+				}
+
+				// Get the trigger value
 				pdo_config->triggers[(sub_index-1)] = (uint8_t)(data & 0x000000FF);
 				break;
 
+				// Mapping indices to PDO's
 			case RPDO1_MAPPING_PARAM_OD:
 			case RPDO2_MAPPING_PARAM_OD:
 			case RPDO3_MAPPING_PARAM_OD:
@@ -612,79 +798,21 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 			case TPDO4_MAPPING_PARAM_OD:
 				response[0] = CAN_SERVER_RESPONSE_SUCCESS;
 				*(int16_t*)&response[1] = index;
-				if (index == RPDO1_MAPPING_PARAM_OD) pdo_config = &can.rpdo1.config;
-				else if (index == RPDO2_MAPPING_PARAM_OD) pdo_config = &can.rpdo2.config;
-				else if (index == RPDO3_MAPPING_PARAM_OD) pdo_config = &can.rpdo3.config;
-				else if (index == RPDO4_MAPPING_PARAM_OD) pdo_config = &can.rpdo4.config;
-				else if (index == TPDO1_MAPPING_PARAM_OD) pdo_config = &can.tpdo1.config;
-				else if (index == TPDO2_MAPPING_PARAM_OD) pdo_config = &can.tpdo2.config;
-				else if (index == TPDO3_MAPPING_PARAM_OD) pdo_config = &can.tpdo3.config;
-				else if (index == TPDO4_MAPPING_PARAM_OD) pdo_config = &can.tpdo4.config;
+				if (index == RPDO1_MAPPING_PARAM_OD) pdo = &can.rpdo1;
+				else if (index == RPDO2_MAPPING_PARAM_OD) pdo = &can.rpdo2;
+				else if (index == RPDO3_MAPPING_PARAM_OD) pdo = &can.rpdo3;
+				else if (index == RPDO4_MAPPING_PARAM_OD) pdo = &can.rpdo4;
+				else if (index == TPDO1_MAPPING_PARAM_OD) pdo = &can.tpdo1;
+				else if (index == TPDO2_MAPPING_PARAM_OD) pdo = &can.tpdo2;
+				else if (index == TPDO3_MAPPING_PARAM_OD) pdo = &can.tpdo3;
+				else if (index == TPDO4_MAPPING_PARAM_OD) pdo = &can.tpdo4;
 				else break;	// Shouldn't happen
 
 				response[3] = sub_index;
 				response_len = 4;
 				switch (sub_index){
 					case PDO_MAPPING_SUBINDEX_NUM_ENTRIES_OD:
-						// If this is greater than zero, COS is enabled, and is based on the mapped indices
-						if (data > 0) {
-							uint16_t index = 0;
-							uint8_t sub_index = 0;
-							uint8_t new_triggers[8] = {0};
-							uint8_t trigger_index = -1, trigger_count = 0;
-							uint8_t i = 0;
-								// Go through mapped registers check which are on and off, disabled un-mapped and enable mapped through triggers
-							for (i = 0; i < sizeof(pdo_config->mapped_indices);i++){
-								// get index and sub index
-								index = (uint16_t)((pdo_config->mapped_indices[i] >> 16) & 0xFFFF);
-								sub_index = (uint8_t)((pdo_config->mapped_indices[i] >> 8) & 0x0000FF);
-								if (index != 0){
-									switch (index){
-										case INPUT_INDEX_OD:
-											// check the sub_index for specific input
-											if (sub_index == INPUT_1_SUBINDEX_OD) trigger_index = TRIGGER_INDEX_DIN_1;
-											else if (sub_index == INPUT_2_SUBINDEX_OD) trigger_index = TRIGGER_INDEX_DIN_2;
-											else if (sub_index == INPUT_3_SUBINDEX_OD) trigger_index = TRIGGER_INDEX_DIN_3;
-											else if (sub_index == INPUT_4_SUBINDEX_OD) trigger_index = TRIGGER_INDEX_DIN_4;
-											else if (sub_index == INPUT_5_SUBINDEX_OD) trigger_index = TRIGGER_INDEX_DIN_5;
-											else if (sub_index == INPUT_6_SUBINDEX_OD) trigger_index = TRIGGER_INDEX_DIN_6;
-											else if (sub_index == INPUT_7_SUBINDEX_OD) trigger_index = TRIGGER_INDEX_DIN_7;
-											else if (sub_index == INPUT_8_SUBINDEX_OD) trigger_index = TRIGGER_INDEX_DIN_8;
-											break;
-										case GYRO_INDEX_OD:
-											// check the sub_index for specific input
-											if (sub_index == GYRO_X_SUBINDEX_OD) trigger_index = TRIGGER_INDEX_GYRO_X;
-											else if (sub_index == GYRO_Y_SUBINDEX_OD) trigger_index = TRIGGER_INDEX_GYRO_Y;
-											else if (sub_index == GYRO_Z_SUBINDEX_OD) trigger_index = TRIGGER_INDEX_GYRO_Z;
-											break;
-										case ACCEL_INDEX_OD:
-											// check the sub_index for specific input
-											if (sub_index == ACCEL_X_SUBINDEX_OD) trigger_index = TRIGGER_INDEX_ACCEL_X;
-											else if (sub_index == ACCEL_Y_SUBINDEX_OD) trigger_index = TRIGGER_INDEX_ACCEL_Y;
-											else if (sub_index == ACCEL_Z_SUBINDEX_OD) trigger_index = TRIGGER_INDEX_ACCEL_Z;
-											break;
-									}
-									// Save the trigger indices for the current mapped registers. This will be used to clear the rest
-									if (trigger_index != -1) {
-										// Keep a sorted array by ascending order
-										insert_sorted(new_triggers, &trigger_count, sizeof(new_triggers), trigger_index);
-									}
-								}
-							}
 
-							// Loop through the trigger indices. Disable old
-							for (i = 0;i<sizeof(pdo_config->triggers);i++){
-								trigger_index = 0;
-								if (i != new_triggers[trigger_index]){
-									pdo_config->triggers[i] = DISABLE;
-								}
-							}
-							// finally show it is on
-							pdo_config->event_mode_val = ENABLE;
-						}
-						else {
-							pdo_config->event_mode_val = DISABLE;
-						}
 						break;
 					case PDO_MAPPING_SUBINDEX_ENTRY_1_OD:
 					case PDO_MAPPING_SUBINDEX_ENTRY_2_OD:
@@ -695,7 +823,11 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 					case PDO_MAPPING_SUBINDEX_ENTRY_7_OD:
 					case PDO_MAPPING_SUBINDEX_ENTRY_8_OD:
 						// Sub-index used to index the array
-						pdo_config->mapped_indices[(sub_index-1)] = data;
+						pdo->config.mapped_indices[(sub_index-1)] = data;
+						// Get the number of bytes for the mapped index
+						// Map data to payload
+						update_pdo_payload(pdo,(sub_index-1));
+
 						break;
 					default:
 						// shouldn't come here
@@ -731,12 +863,19 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 						break;
 					case PDO_COMM_PARAM_TRANS_TYPE_SUBINDEX_OD:
 						// Synchronous or asynchronouss (value from 0->255) 255 == Async and 0->254 is the amount of Syncs before send
-						if (data == 0xFF) {
-							pdo_config->sync_mode_val = DISABLE;
+						if (data == 255) {
 							pdo_config->cyclic_mode = ENABLE;
-						} else if (data > 0){
-							pdo_config->sync_mode_val = data;
+							pdo_config->event_mode_val = ENABLE;
+						} else if (data > 240 && data < 255){
+							response[0] = CAN_SERVER_RESPONSE_ERROR;
+							break;
 						}
+						pdo_config->transmission_type = data;
+//						Transmission Type	Mode	Behavior
+//						0	Acyclic - Synchronous	Send PDO once on the first SYNC message after an event.
+//						1-240	Cyclic - Synchronous	Send PDO every N-th SYNC message (where N = 1-240).
+//						241-254	Reserved	Not officially defined in the standard.
+//						255	Asynchronous	Send PDO only on an event (e.g., COS, timer-based).
 						// Need to check the data to see what modes are enabled
 						break;
 					case PDO_COMM_PARAM_INHIBIT_TIME_SUBINDEX_OD:
