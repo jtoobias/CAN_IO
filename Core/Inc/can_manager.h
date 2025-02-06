@@ -319,6 +319,10 @@ typedef struct{
 
 	int16_t analog_thresholds[PDO_NUMBER_OF_ANALOG_TRIGGERS];				// Thresholds for analog trigger
 
+
+    // Function pointer for a function taking (void) and returning void
+    void (*call_back)(void);
+
 }pdo_config_t;
 
 // PDO mapping can be done by receiving indices which will be used to map the variables to the correct pdo
@@ -328,6 +332,7 @@ typedef struct {
 	void* payload[8];						// This points the the variables that are sent or received in the pdo
 	int8_t cos_occured;
 	pdo_config_t config;
+	uint8_t sync_count;
 
 }pdo_t;
 
@@ -409,18 +414,24 @@ void insert_sorted(uint8_t *array, uint8_t *current_size, uint8_t arr_size, uint
 void init_pdo(uint32_t func_code,pdo_t *pdo,pdo_config_t *ee_pdo);
 void send_pdo(pdo_t *pdo);
 void send_cyclic_pdo(pdo_t* pdo);
-int8_t pdo_sync_output_check_and_update(pdo_t* rpdo);
+//int8_t pdo_sync_output_check_and_update(pdo_t* rpdo);
 int8_t pdo_input_check_wrapper(uint8_t input_index, uint8_t new_val);
-int8_t pdo_input_check_and_send(pdo_t* tpdo,uint8_t input_index,uint8_t new_val);
+int8_t tpdo_input_check_and_send(pdo_t* tpdo,uint8_t input_index,uint8_t new_val);
+int8_t rpdo_input_check_and_send(pdo_t* rpdo,uint8_t input_index,uint8_t new_val);
 int8_t check_analog_low_to_high_trigger(pdo_config_t* tpdo_config,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val);
 int8_t check_analog_high_to_low_trigger(pdo_config_t* tpdo_config,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val);
-int8_t check_pdo_triggered_by_analog(pdo_t* tpdo,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val);
-void check_all_tpdos_for_analgo_trigger(pdo_t* tpdo,can_t* can_ptr,ICM42670P_t *imu_ptr);
+int8_t check_pdo_triggered_by_analog(pdo_t* pdo,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val);
+void check_all_tpdos_for_analog_trigger(pdo_t* pdo,can_t* can_ptr,ICM42670P_t *imu_ptr);
+void check_all_rpdos_for_analog_trigger(pdo_t* rpdo,can_t* can_ptr,ICM42670P_t *imu_ptr);
+void rpdo_handler(pdo_config_t *rpdo_config,uint8_t *packet);
 void update_pdo_payload(pdo_t *pdo, uint8_t arr_index);
 void sdo_handler(uint8_t *packet,uint32_t len);
 void nmt_handler(uint8_t *packet,uint32_t len);
 void sync_handler(void);
 void can_state_manager(void);
+
+void tpdo_sync_checks(pdo_t *rpdo);
+void rpdo_sync_checks(pdo_t *rpdo);
 
 int is_buffer_full();
 int is_buffer_empty();
