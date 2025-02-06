@@ -81,16 +81,18 @@ void setup_CAN_cfg(void){
 	if (HAL_CAN_ConfigFilter(can.handler, &can.filter) != HAL_OK) {
 	  Error_Handler(); // Replace with appropriate error handling
 	}
+
 	EE_Read();
 	init_pdo(TPDO1,&can.tpdo1,&eeprom_storage.tpdo1);
-//	init_pdo(&can.tpdo2);
-//	init_pdo(&can.tpdo3);
-//	init_pdo(&can.tpdo4);
-//
-//	init_pdo(&can.rpdo1);
-//	init_pdo(&can.rpdo2);
-//	init_pdo(&can.rpdo3);
-//	init_pdo(&can.rpdo4);
+	init_pdo(TPDO2,&can.tpdo2,&eeprom_storage.tpdo2);
+	init_pdo(TPDO3,&can.tpdo3,&eeprom_storage.tpdo3);
+	init_pdo(TPDO4,&can.tpdo4,&eeprom_storage.tpdo4);
+
+
+	init_pdo(RPDO1,&can.rpdo1,&eeprom_storage.rpdo1);
+	init_pdo(RPDO2,&can.rpdo2,&eeprom_storage.rpdo2);
+	init_pdo(RPDO3,&can.rpdo3,&eeprom_storage.rpdo3);
+	init_pdo(RPDO4,&can.rpdo4,&eeprom_storage.rpdo4);
 
 		// Clear the transmit buffer
 	can.tx_buffer.head = 0;
@@ -99,16 +101,17 @@ void setup_CAN_cfg(void){
 
 // Place holder. This will likely be filled in my eeprom variables
 void init_pdo(uint32_t func_code,pdo_t *pdo,pdo_config_t *ee_pdo){
-
-	pdo->config._cob_id = func_code | can.id_u.id_value;
+		// Initially disable, until set by eeprom or by the software
+	pdo->config._cob_id = PDO_DISABLED_COB_ID | func_code | can.id_u.id_value;
 	memset(pdo->config.number_of_bytes, 0, sizeof(pdo->config.number_of_bytes)); // Set all elements to 0
-	pdo->config.inhibit_time = 1500;
+	pdo->config.total_number_of_bytes = 0;
+	pdo->config.inhibit_time = 0;
 	pdo->config.last_send_time = get_ms_timer();
-	pdo->config.transmit_period = 1000;
+	pdo->config.transmit_period = 0;
 	memset(pdo->config.mode, DISABLE, sizeof(pdo->config.mode));
 
 	pdo->config.cyclic_mode = DISABLE;
-	pdo->config.transmission_type = ENABLE;
+	pdo->config.transmission_type = 250; // UNKNOWN type
 
 	memset(pdo->config.triggers, DISABLE, sizeof(pdo->config.triggers)); // Set all elements to 0
 	memset(pdo->config.analog_thresholds, 0, sizeof(pdo->config.analog_thresholds)); // Set all elements to 0
@@ -218,17 +221,19 @@ int8_t check_pdo_triggered_by_analog(pdo_t* tpdo,uint8_t trigger_index, uint8_t 
 	if (check_analog_low_to_high_trigger(&tpdo->config,trigger_index,analog_threshold_index,new_val,last_val) ||
 		check_analog_high_to_low_trigger(&tpdo->config,trigger_index,analog_threshold_index,new_val,last_val)){
 		send_pdo(tpdo);
+		return TRUE;
 	}
+	return FALSE;
 }
 
-int8_t check_all_tpdos_for_analgo_trigger(pdo_t* tpdo,can_t* can_ptr,ICM42670P_t *imu_ptr){
+void check_all_tpdos_for_analgo_trigger(pdo_t* tpdo,can_t* can_ptr,ICM42670P_t *imu_ptr){
 
-	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_X, ANALOG_THRESHOLD_INDEX_GYRO_X, &imu_ptr->gyro_x_conv, &can_ptr->last_gyro_x);
-	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_Y, ANALOG_THRESHOLD_INDEX_GYRO_Y, &imu_ptr->gyro_y_conv, &can_ptr->last_gyro_y);
-	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_Z, ANALOG_THRESHOLD_INDEX_GYRO_Z, &imu_ptr->gyro_z_conv, &can_ptr->last_gyro_z);
-	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_X, ANALOG_THRESHOLD_INDEX_ACCEL_X, &imu_ptr->accel_x_conv, &can_ptr->last_accel_x);
-	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_Y, ANALOG_THRESHOLD_INDEX_ACCEL_Y, &imu_ptr->accel_y_conv, &can_ptr->last_accel_y);
-	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_Z, ANALOG_THRESHOLD_INDEX_ACCEL_Z, &imu_ptr->accel_z_conv, &can_ptr->last_accel_z);
+	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_X, ANALOG_THRESHOLD_INDEX_GYRO_X, imu_ptr->gyro_x_conv, can_ptr->last_gyro_x);
+	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_Y, ANALOG_THRESHOLD_INDEX_GYRO_Y, imu_ptr->gyro_y_conv, can_ptr->last_gyro_y);
+	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_Z, ANALOG_THRESHOLD_INDEX_GYRO_Z, imu_ptr->gyro_z_conv, can_ptr->last_gyro_z);
+	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_X, ANALOG_THRESHOLD_INDEX_ACCEL_X, imu_ptr->accel_x_conv, can_ptr->last_accel_x);
+	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_Y, ANALOG_THRESHOLD_INDEX_ACCEL_Y, imu_ptr->accel_y_conv, can_ptr->last_accel_y);
+	check_pdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_Z, ANALOG_THRESHOLD_INDEX_ACCEL_Z, imu_ptr->accel_z_conv, can_ptr->last_accel_z);
 }
 
 
@@ -458,8 +463,11 @@ int8_t send_can_packet(uint32_t cob_id,uint8_t *data,uint32_t data_len){
 void send_pdo(pdo_t *pdo){
 	uint8_t tx_buffer[8] = {0};
 	uint8_t i = 0, payload_size = 0;
+
+		// Check if the disabled bit is set
+	if (pdo->config._cob_id & PDO_DISABLED_COB_ID) return;
 		// Don't send if the time since last send is less than the inhibit period
-	if (diff_ms_timer(pdo->config.last_send_time) < pdo->config.inhibit_time)return;
+	if (diff_ms_timer(pdo->config.last_send_time) < pdo->config.inhibit_time) return;
 	// loop through the bytes
 	for (i = 0; i < sizeof(pdo->config.number_of_bytes);i++){
 		// exit if variable is not setup

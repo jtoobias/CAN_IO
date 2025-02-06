@@ -8,6 +8,7 @@
 #ifndef INC_CAN_MANAGER_H_
 #define INC_CAN_MANAGER_H_
 #include "stm32f1xx_hal.h"
+#include "ICM42670P.h"
 
 #define CAN_TX_BUFFER_SIZE 12 // Adjust as needed
 
@@ -175,6 +176,9 @@
 //heartbeat
 #define HEARTBEAT		0x700
 
+
+#define PDO_DISABLED_COB_ID 0x80000000
+
 // SDO write commands (respond with success)
 #define WR_CLIENT_REQUEST_CMD_1_BYTE	0x2F
 #define WR_CLIENT_REQUEST_CMD_2_BYTE	0x2B
@@ -274,7 +278,6 @@
 #define PDO_NUMBER_OF_BYTES_1		0x01
 #define PDO_NUMBER_OF_BYTES_2		0x02
 #define PDO_NUMBER_OF_BYTES_4		0x03
-
 
 
 typedef struct {
@@ -409,10 +412,10 @@ void send_cyclic_pdo(pdo_t* pdo);
 int8_t pdo_sync_output_check_and_update(pdo_t* rpdo);
 int8_t pdo_input_check_wrapper(uint8_t input_index, uint8_t new_val);
 int8_t pdo_input_check_and_send(pdo_t* tpdo,uint8_t input_index,uint8_t new_val);
-int8_t check_analog_low_to_high_trigger(pdo_config_t* tpdo_config,uint8_t trigger_index, uint8_t analog_threshold_index,uint8_t new_val,int16_t last_val);
-int8_t check_analog_high_to_low_trigger(pdo_config_t* tpdo_config,uint8_t trigger_index, uint8_t analog_threshold_index,uint8_t new_val,int16_t last_val);
+int8_t check_analog_low_to_high_trigger(pdo_config_t* tpdo_config,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val);
+int8_t check_analog_high_to_low_trigger(pdo_config_t* tpdo_config,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val);
 int8_t check_pdo_triggered_by_analog(pdo_t* tpdo,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val);
-int8_t check_all_tpdos_for_analgo_trigger(pdo_t* tpdo,can_t* can_ptr,ICM42670P_t *imu_ptr);
+void check_all_tpdos_for_analgo_trigger(pdo_t* tpdo,can_t* can_ptr,ICM42670P_t *imu_ptr);
 void update_pdo_payload(pdo_t *pdo, uint8_t arr_index);
 void sdo_handler(uint8_t *packet,uint32_t len);
 void nmt_handler(uint8_t *packet,uint32_t len);

@@ -14,7 +14,7 @@ Completed:
 
 Testing Required:
 - Manage Triggers on Inputs and Analog readings
-- Make sure Transmission Type settings are correct
+- Make sure Transmission Type settings are correct (Tested periods, syncs, but not events)
 
 ToDo:
 - Store PDO mapping in EEprom 

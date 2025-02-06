@@ -147,12 +147,16 @@ int main(void)
 	  // Handle pdo setup for interval based sends (T) Tested
 	  // Handle pdo send on sync (T) Tested
 	  // handle pdo on input change (T)
-	  // handle pdo on threshold trigger
+	  // handle pdo on threshold trigger (T)
 
 	  // EEPROM;
 	  // For each PDO store mapped indices and bytes per index
-
-	  send_cyclic_pdo(&can.tpdo1);
+	  if (can.state == CAN_STATE_OPERATIONAL){
+		  send_cyclic_pdo(&can.tpdo1);
+		  send_cyclic_pdo(&can.tpdo2);
+		  send_cyclic_pdo(&can.tpdo3);
+		  send_cyclic_pdo(&can.tpdo4);
+	  }
 
 	  if (diff_ms_timer(hardware.last_can_state_check_time) >= 200){
 		  hardware.last_can_state_check_time = get_ms_timer();
