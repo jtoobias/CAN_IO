@@ -991,6 +991,53 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 						break;
 				}
 				break;
+			case ACCEL_OFFSET_OD:
+				response[0] = CAN_SERVER_RESPONSE_SUCCESS;
+				*(int16_t*)&response[1] = index;
+				response[3] = sub_index;
+				response_len = 4;
+				switch (sub_index){
+					case ACCEL_OFFSET_X_SUB:
+						ICM42670P.accel_x_offset += data;
+						break;
+					case ACCEL_OFFSET_Y_SUB:
+						ICM42670P.accel_y_offset += data;
+						break;
+					case ACCEL_OFFSET_Z_SUB:
+						ICM42670P.accel_z_offset += data;
+						break;
+					default:
+						// shouldn't come here
+						break;
+				}
+				break;
+			case GYRO_OFFSET_OD:
+				response[0] = CAN_SERVER_RESPONSE_SUCCESS;
+				*(int16_t*)&response[1] = index;
+				response[3] = sub_index;
+				response_len = 4;
+				switch (sub_index){
+					case GYRO_OFFSET_X_SUB:
+						ICM42670P.gyro_x_offset += data;
+						break;
+					case GYRO_OFFSET_Y_SUB:
+						ICM42670P.gyro_y_offset += data;
+						break;
+					case GYRO_OFFSET_Z_SUB:
+						ICM42670P.gyro_z_offset += data;
+						break;
+					default:
+						// shouldn't come here
+						break;
+				}
+				break;
+			case TEMP_OFFSET_OD:
+				response[0] = CAN_SERVER_RESPONSE_SUCCESS;
+				*(int16_t*)&response[1] = index;
+				response[3] = TEMP_OFFSET_SUB;
+				response_len = 4;
+				ICM42670P.temperature_offset += data;
+				break;
 			case OUTPUT_INDEX_OD:
 				hardware.output_value = data;
 				set_outputs();

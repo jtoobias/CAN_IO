@@ -144,6 +144,22 @@
 #define GYRO_Y_SUBINDEX_OD					0x02
 #define GYRO_Z_SUBINDEX_OD					0x03
 
+// Accelerometer Offset (Three Axes)
+#define ACCEL_OFFSET_OD        0x3000
+#define ACCEL_OFFSET_X_SUB     0x01
+#define ACCEL_OFFSET_Y_SUB     0x02
+#define ACCEL_OFFSET_Z_SUB     0x03
+
+// Gyroscope Offset (Three Axes)
+#define GYRO_OFFSET_OD         0x3001
+#define GYRO_OFFSET_X_SUB      0x01
+#define GYRO_OFFSET_Y_SUB      0x02
+#define GYRO_OFFSET_Z_SUB      0x03
+
+// Temperature Offset
+#define TEMP_OFFSET_OD         0x3002
+#define TEMP_OFFSET_SUB        0x00
+
 
 //Transmit PDO1 (TPDO1)	0x4	0x180 + Node ID
 //Transmit PDO2 (TPDO2)	0x5	0x280 + Node ID

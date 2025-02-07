@@ -42,7 +42,7 @@ uint8_t ICM42670P_init (SPI_HandleTypeDef *hSPI){
 	ICM42670P.gyro_z_offset = 0;
 
 //	 Very rough guess
-	ICM42670P.temperature_offset = -100;
+	ICM42670P.temperature_offset = 0;
 
 	return status;
 }
@@ -163,19 +163,19 @@ void ICM42670P_read_imu_DMA_complete (void){
 	int16_t temp = (int16_t)(ICM42670P.data_rx_buffer[1] << 8 | ICM42670P.data_rx_buffer[2]);
 	ICM42670P.temperature = ((temp*10)/128) + (25*10) + ICM42670P.temperature_offset;
     // Combine high and low bytes for each axis
-	ICM42670P.accel_y = ((int16_t)(ICM42670P.data_rx_buffer[3] << 8 | ICM42670P.data_rx_buffer[4]))+ICM42670P.accel_y_offset; // Y-axis
-	ICM42670P.accel_x = (int16_t)(ICM42670P.data_rx_buffer[5] << 8 | ICM42670P.data_rx_buffer[6])+ICM42670P.accel_x_offset; // X-axis (X and Y mixed up)
-	ICM42670P.accel_z = (int16_t)(ICM42670P.data_rx_buffer[7] << 8 | ICM42670P.data_rx_buffer[8])+ICM42670P.accel_z_offset; // Z-axis
+	ICM42670P.accel_y = ((int16_t)(ICM42670P.data_rx_buffer[3] << 8 | ICM42670P.data_rx_buffer[4])); // Y-axis
+	ICM42670P.accel_x = (int16_t)(ICM42670P.data_rx_buffer[5] << 8 | ICM42670P.data_rx_buffer[6]); // X-axis (X and Y mixed up)
+	ICM42670P.accel_z = (int16_t)(ICM42670P.data_rx_buffer[7] << 8 | ICM42670P.data_rx_buffer[8]); // Z-axis
     // Combine high and low bytes for each axis
-	ICM42670P.gyro_y = (int16_t)(ICM42670P.data_rx_buffer[9] << 8 | ICM42670P.data_rx_buffer[10])+ICM42670P.gyro_y_offset; // Y-axis
-	ICM42670P.gyro_x = (int16_t)(ICM42670P.data_rx_buffer[11] << 8 | ICM42670P.data_rx_buffer[12])+ICM42670P.gyro_x_offset; // X-axis (X and Y mixed up)
-	ICM42670P.gyro_z = (int16_t)(ICM42670P.data_rx_buffer[13] << 8 | ICM42670P.data_rx_buffer[14])+ICM42670P.gyro_z_offset; // Z-axis
+	ICM42670P.gyro_y = (int16_t)(ICM42670P.data_rx_buffer[9] << 8 | ICM42670P.data_rx_buffer[10]); // Y-axis
+	ICM42670P.gyro_x = (int16_t)(ICM42670P.data_rx_buffer[11] << 8 | ICM42670P.data_rx_buffer[12]); // X-axis (X and Y mixed up)
+	ICM42670P.gyro_z = (int16_t)(ICM42670P.data_rx_buffer[13] << 8 | ICM42670P.data_rx_buffer[14]); // Z-axis
 
-	ICM42670P.accel_x_conv = ((int32_t)ICM42670P.accel_x*ACCELERATION_G_EARTH_X100)/ACCEL_UI_FS_SEL2_RES;
-	ICM42670P.accel_y_conv = ((int32_t)ICM42670P.accel_y*ACCELERATION_G_EARTH_X100)/ACCEL_UI_FS_SEL2_RES;
-	ICM42670P.accel_z_conv = ((int32_t)ICM42670P.accel_z*ACCELERATION_G_EARTH_X100)/ACCEL_UI_FS_SEL2_RES;
+	ICM42670P.accel_x_conv = (((int32_t)ICM42670P.accel_x*ACCELERATION_G_EARTH_X100)/ACCEL_UI_FS_SEL2_RES)+ICM42670P.accel_x_offset;
+	ICM42670P.accel_y_conv = (((int32_t)ICM42670P.accel_y*ACCELERATION_G_EARTH_X100)/ACCEL_UI_FS_SEL2_RES)+ICM42670P.accel_y_offset;
+	ICM42670P.accel_z_conv = (((int32_t)ICM42670P.accel_z*ACCELERATION_G_EARTH_X100)/ACCEL_UI_FS_SEL2_RES)+ICM42670P.accel_z_offset;
 
-	ICM42670P.gyro_x_conv = ((int32_t)ICM42670P.gyro_x*1000)/GYRO_UI_FS_SEL2_RES_X10;
-	ICM42670P.gyro_y_conv = ((int32_t)ICM42670P.gyro_y*1000)/GYRO_UI_FS_SEL2_RES_X10;
-	ICM42670P.gyro_z_conv = ((int32_t)ICM42670P.gyro_z*1000)/GYRO_UI_FS_SEL2_RES_X10;
+	ICM42670P.gyro_x_conv = ((int32_t)ICM42670P.gyro_x*1000)/GYRO_UI_FS_SEL2_RES_X10+ICM42670P.gyro_x_offset;
+	ICM42670P.gyro_y_conv = ((int32_t)ICM42670P.gyro_y*1000)/GYRO_UI_FS_SEL2_RES_X10+ICM42670P.gyro_y_offset;
+	ICM42670P.gyro_z_conv = ((int32_t)ICM42670P.gyro_z*1000)/GYRO_UI_FS_SEL2_RES_X10+ICM42670P.gyro_z_offset;
 }
