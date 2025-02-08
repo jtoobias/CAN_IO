@@ -793,7 +793,6 @@ void rpdo_sync_checks(pdo_t *rpdo){
 			rpdo->sync_count = 0;
 			if (rpdo->config.call_back == NULL) {
 				// Error with callback not set
-				HAL_Delay(1);
 				return;
 			}
 				// call the function handler for this rpdo
@@ -801,8 +800,7 @@ void rpdo_sync_checks(pdo_t *rpdo){
 			// check if a COS has occurred
 		} else if (rpdo->config.transmission_type == TRANSMISSION_TYPE_MODE_ACYCLIC && rpdo->cos_occured == TRUE){
 			if (rpdo->config.call_back == NULL) {
-				// Error with callback not set
-				HAL_Delay(1);
+				// Error with callback not set, dont call Hal_delay in interrupt, causes progam to get lost
 				return;
 			}
 			rpdo->config.call_back();
@@ -832,7 +830,6 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 			break;
 		default:
 			// ERROR
-			HAL_Delay(1);
 			return;
 			break;
 	}
@@ -878,7 +875,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 				else if (index == TPDO4_TRIGGER_DIRS_OD) pdo_config = &can.tpdo4.config;
 				else break;
 				if (sub_index == 0x0F){
-					HAL_Delay(1);
+					// Wrong
 				}
 
 				// Get the trigger value
