@@ -26,6 +26,24 @@
 #define DEVICE_TYPE_INDEX_OD	0x1000
 #define DEVICE_TYPE_SUBINDEX_OD	0x00
 
+//Bit 0 (Generic Error) 				→ Any unknown failure occurs.
+//Bit 1 (Current Error) 				→ Overcurrent detected in an I/O channel.
+//Bit 2 (Voltage Error) 				→ Power supply too high/low.
+//Bit 3 (Temperature Error) 			→ Device overheats.
+//Bit 4 (Communication Error) 			→ CAN bus off or bus error detected.
+//Bit 5 (Profile-Specific Error) 		→ Invalid sensor reading or actuator failure.
+//6	Reserved	Not used (reserved for future use).
+//Bit 7 (Manufacturer-Specific Error) 	→ Custom issues like hardware faults.
+
+#define ERROR_GENERIC				0x01
+#define ERROR_CURRENT				0x02
+#define ERROR_VOLTAGE				0x04
+#define ERROR_TEMPERATURE			0x08
+#define ERROR_COMMUNICATION			0x10
+#define ERROR_SENSOR				0x20
+#define ERROR_CUSTOM				0x80
+
+
 #define ERROR_REG_INDEX_OD			0x1001
 #define DERROR_REG_SUBINDEX_OD		0x00
 #define HEARTBEAT_INDEX_OD			0x1017
@@ -159,6 +177,9 @@
 // Temperature Offset
 #define TEMP_OFFSET_OD         0x3002
 #define TEMP_OFFSET_SUB        0x00
+
+// Device State
+#define DEVICE_STATE_OD        0x7000
 
 
 //Transmit PDO1 (TPDO1)	0x4	0x180 + Node ID
@@ -400,6 +421,9 @@ typedef struct{
 
 	uint8_t state;
 	uint8_t target_state;
+
+	volatile uint8_t error;
+	volatile uint8_t send_fail_count;
 
 	pdo_t tpdo1;						// This holds the information for the Transmit pdo
 	pdo_t tpdo2;						// This holds the information for the Transmit pdo

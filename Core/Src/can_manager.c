@@ -19,6 +19,8 @@ void can_init(CAN_HandleTypeDef *can_handler){
 	can.handler = can_handler;
 	can.state = CAN_STATE_INIT;
 	can.target_state = CAN_STATE_PREOPERATIONAL;
+	can.error = 0;
+	can.send_fail_count = 0;
 }
 
   // Call before starting CAN
@@ -463,8 +465,11 @@ void CAN_TxHandler(CAN_HandleTypeDef *hcan) {
             if (HAL_CAN_AddTxMessage(hcan, &packet.header, packet.data, &free_mailbox) != HAL_OK) {
                 // Transmission failed, re-enqueue the packet
             	add_packet_to_front_of_queue(&packet);
+            	can.send_fail_count ++;
+            	if (can.send_fail_count >= 5) can.error |= ERROR_COMMUNICATION;
                 break;
             }
+        	can.send_fail_count = 0;
         } else {
         	// no mail box free/no packets
         	add_packet_to_front_of_queue(&packet);
@@ -579,9 +584,9 @@ void update_pdo_payload(pdo_t *pdo, uint8_t arr_index){
 	uint16_t od_index = (data >> 16);
 	// Check the mapped register for what data needs to be sent
 	switch (od_index){
-		case INPUT_INDEX_OD:
-			// Only allow the whole input bytes to be sent and not individual bits
-			pdo->payload[arr_index] = (void*)&hardware.input_value;
+
+		case ERROR_REG_INDEX_OD:
+			pdo->payload[arr_index] = (void*)&can.error;
 			break;
 		case OUTPUT_INDEX_OD:
 			// Only allow the whole output bytes to be sent and not individual bits
@@ -618,6 +623,11 @@ void update_pdo_payload(pdo_t *pdo, uint8_t arr_index){
 					pdo->payload[arr_index] = (void*)&ICM42670P.gyro_z_conv;
 					break;
 			}
+			break;
+		case DEVICE_STATE_OD:
+			pdo->payload[arr_index] = (void*)&can.state;
+			break;
+		default:
 			break;
 	}
 }
@@ -1068,6 +1078,13 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 				response_len = 8;
 				break;
 
+			case ERROR_REG_INDEX_OD:
+				response[0] = RD_SERVER_RESPONSE_CMD_1_BYTE;
+				// device type is  I/O device
+				response[4] = can.error;
+				response_len = 5;
+				break;
+
 			case ID_OBJECT_OD:
 				response[0] = RD_SERVER_RESPONSE_CMD_4_BYTE;
 				switch (sub_index){
@@ -1180,6 +1197,13 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 					}
 					response_len = 6;
 //					send_can_packet((TSDO|can.id_u.id_value),response,response_len);
+					break;
+
+				case DEVICE_STATE_OD:
+					response[0] = RD_SERVER_RESPONSE_CMD_1_BYTE;
+					*(int16_t*)&response[1] = index;
+					response[3] = sub_index;
+					*(uint8_t*)&response[4] = can.state;
 					break;
 
 			default:

@@ -455,6 +455,7 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
+	  can.error |= ERROR_GENERIC;
   }
   /* USER CODE END Error_Handler_Debug */
 }
