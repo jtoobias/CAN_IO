@@ -21,6 +21,7 @@ void can_init(CAN_HandleTypeDef *can_handler){
 	can.target_state = CAN_STATE_PREOPERATIONAL;
 	can.error = 0;
 	can.send_fail_count = 0;
+	can.save_settings = 0;
 }
 
   // Call before starting CAN
@@ -84,17 +85,18 @@ void setup_CAN_cfg(void){
 	  Error_Handler(); // Replace with appropriate error handling
 	}
 
-	EE_Read();
-	init_pdo(TPDO1,&can.tpdo1,&eeprom_storage.tpdo1);
-	init_pdo(TPDO2,&can.tpdo2,&eeprom_storage.tpdo2);
-	init_pdo(TPDO3,&can.tpdo3,&eeprom_storage.tpdo3);
-	init_pdo(TPDO4,&can.tpdo4,&eeprom_storage.tpdo4);
-
-
-	init_pdo(RPDO1,&can.rpdo1,&eeprom_storage.rpdo1);
-	init_pdo(RPDO2,&can.rpdo2,&eeprom_storage.rpdo2);
-	init_pdo(RPDO3,&can.rpdo3,&eeprom_storage.rpdo3);
-	init_pdo(RPDO4,&can.rpdo4,&eeprom_storage.rpdo4);
+//	EE_Read();
+	load_configuration();
+//	init_pdo(TPDO1,&can.tpdo1,&eeprom_storage.tpdo1);
+//	init_pdo(TPDO2,&can.tpdo2,&eeprom_storage.tpdo2);
+//	init_pdo(TPDO3,&can.tpdo3,&eeprom_storage.tpdo3);
+//	init_pdo(TPDO4,&can.tpdo4,&eeprom_storage.tpdo4);
+//
+//
+//	init_pdo(RPDO1,&can.rpdo1,&eeprom_storage.rpdo1);
+//	init_pdo(RPDO2,&can.rpdo2,&eeprom_storage.rpdo2);
+//	init_pdo(RPDO3,&can.rpdo3,&eeprom_storage.rpdo3);
+//	init_pdo(RPDO4,&can.rpdo4,&eeprom_storage.rpdo4);
 
 		// Clear the transmit buffer
 	can.tx_buffer.head = 0;
@@ -102,9 +104,9 @@ void setup_CAN_cfg(void){
 }
 
 // Place holder. This will likely be filled in my eeprom variables
-void init_pdo(uint32_t func_code,pdo_t *pdo,pdo_config_t *ee_pdo){
+void clear_pdo_config(pdo_t *pdo){
 		// Initially disable, until set by eeprom or by the software
-	pdo->config._cob_id = PDO_DISABLED_COB_ID | func_code | can.id_u.id_value;
+	pdo->config._cob_id = 0;
 	memset(pdo->config.number_of_bytes, 0, sizeof(pdo->config.number_of_bytes)); // Set all elements to 0
 	pdo->config.total_number_of_bytes = 0;
 	pdo->sync_count = 0;
@@ -119,17 +121,11 @@ void init_pdo(uint32_t func_code,pdo_t *pdo,pdo_config_t *ee_pdo){
 	memset(pdo->config.triggers, DISABLE, sizeof(pdo->config.triggers)); // Set all elements to 0
 	memset(pdo->config.analog_thresholds, 0, sizeof(pdo->config.analog_thresholds)); // Set all elements to 0
 
+	memset(pdo->config.mapped_indices, 0, sizeof(pdo->config.mapped_indices)); // Set all elements to 0
+
 	pdo->config.call_back = NULL;
-
-
-//	pdo->payload[0] = (int16_t*)&ICM42670P.accel_x_conv;
-//	pdo->payload[1] = (int16_t*)&ICM42670P.accel_y_conv;
-//	pdo->payload[2] = (int16_t*)&ICM42670P.accel_z_conv;
-//	pdo->config.number_of_bytes[0] = PDO_NUMBER_OF_BYTES_2;
-//	pdo->config.number_of_bytes[1] = PDO_NUMBER_OF_BYTES_2;
-//	pdo->config.number_of_bytes[2] = PDO_NUMBER_OF_BYTES_2;
+	pdo->config.cb_function_id = 0;
 }
-
 
 int8_t pdo_input_check_wrapper(uint8_t input_index, uint8_t new_val){
 	int8_t debug_status = FALSE;
@@ -754,7 +750,8 @@ void rpdo_handler(pdo_config_t *rpdo_config,uint8_t *packet){
 		switch (index){
 			case OUTPUT_INDEX_OD:
 				hardware.output_value = (uint16_t)tmp_val;
-				rpdo_config->call_back = set_outputs;
+//				rpdo_config->call_back = set_outputs;
+//				rpdo_config->cb_function_id = 1;
 				break;
 		default:
 				// Shouldn't reach here
@@ -853,6 +850,13 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 	if (cmd & 0x20){
 		// Use data length to get data out (set objects)
 		switch (index){
+			case SAVE_CONFIG_INDEX_OD:
+				can.save_settings = (uint8_t)(data & 0xFF);
+				response[0] = CAN_SERVER_RESPONSE_SUCCESS;
+				*(int16_t*)&response[1] = index;
+				response[3] = sub_index;
+				response_len = 4;
+				break;
 				// Get analog trigger values
 			case TPDO1_ANALOG_THRESHOLDS_OD:
 			case TPDO2_ANALOG_THRESHOLDS_OD:
@@ -932,6 +936,22 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 						// Get the number of bytes for the mapped index
 						// Map data to payload
 						update_pdo_payload(pdo,(sub_index-1));
+
+						// Update call back functions
+						uint16_t od_index = data>>16;
+						//sub_index = (rpdo_config->mapped_indices[i]>>8) & 0xFF;
+						// Only outputs are mappable but build it so it can be extended.
+						// Update variables so that they can be executed later when required
+						switch (od_index){
+							case OUTPUT_INDEX_OD:
+								pdo->config.call_back = set_outputs;
+								pdo->config.cb_function_id = 1;
+								break;
+						default:
+								// Shouldn't reach here
+							break;
+
+						}
 
 						break;
 					default:
@@ -1204,6 +1224,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 					*(int16_t*)&response[1] = index;
 					response[3] = sub_index;
 					*(uint8_t*)&response[4] = can.state;
+					response_len = 5;
 					break;
 
 			default:

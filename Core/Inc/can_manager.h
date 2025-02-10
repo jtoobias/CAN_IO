@@ -25,6 +25,7 @@
 //OD
 #define DEVICE_TYPE_INDEX_OD	0x1000
 #define DEVICE_TYPE_SUBINDEX_OD	0x00
+#define SAVE_CONFIG_INDEX_OD	0x1010
 
 //Bit 0 (Generic Error) 				→ Any unknown failure occurs.
 //Bit 1 (Current Error) 				→ Overcurrent detected in an I/O channel.
@@ -359,6 +360,7 @@ typedef struct{
 
     // Function pointer for a function taking (void) and returning void
     void (*call_back)(void);
+    uint8_t cb_function_id;
 
 }pdo_config_t;
 
@@ -444,6 +446,8 @@ typedef struct{
 	int16_t last_accel_y;
 	int16_t last_accel_z;
 
+	uint8_t save_settings;
+
 }can_t;
 // Declare the global instance of hardware_t
 extern can_t can;
@@ -452,6 +456,7 @@ void can_init(CAN_HandleTypeDef *can_handler);
 void setup_CAN_cfg(void);
 void insert_sorted(uint8_t *array, uint8_t *current_size, uint8_t arr_size, uint8_t value);
 void init_pdo(uint32_t func_code,pdo_t *pdo,pdo_config_t *ee_pdo);
+void clear_pdo_config(pdo_t *pdo);
 void send_pdo(pdo_t *pdo);
 void send_cyclic_pdo(pdo_t* pdo);
 //int8_t pdo_sync_output_check_and_update(pdo_t* rpdo);

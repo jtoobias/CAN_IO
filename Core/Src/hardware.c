@@ -6,7 +6,7 @@
  */
 #include "hardware.h"
 #include "main.h"
-//#include <string.h>
+#include <string.h>
 // Variables
 // Define the global instance of hardware_t
 hardware_t hardware;
@@ -20,6 +20,22 @@ void hardware_init(CAN_HandleTypeDef *can_handler,SPI_HandleTypeDef *hSPI){
 	can_init(can_handler);
 	ICM42670P_init(hSPI);
     EE_Init(&eeprom_storage,sizeof(eeprom_storage));
+    EE_Read();
+    	// If it is first boot clear all of the eeprom storage area and set the init flag
+    if (eeprom_storage.init_flag != 1){
+    	clear_pdo_config(&can.tpdo1);
+    	clear_pdo_config(&can.tpdo2);
+    	clear_pdo_config(&can.tpdo3);
+    	clear_pdo_config(&can.tpdo4);
+
+    	clear_pdo_config(&can.rpdo1);
+    	clear_pdo_config(&can.rpdo2);
+    	clear_pdo_config(&can.rpdo3);
+    	clear_pdo_config(&can.rpdo4);
+    	eeprom_storage.init_flag = 1;
+    	can.save_settings = 1;
+    	save_configuration();
+    }
 }
 
 // This requires the EE_Write() to be called still
@@ -27,9 +43,116 @@ void update_can_ee_pdo_config(pdo_config_t *ee_pdo,pdo_config_t *pdo,int pdo_siz
 	memcpy(ee_pdo,pdo,pdo_size);
 }
 
+// This requires the EE_Write() to be called still
+void load_can_ee_pdo_config(pdo_config_t *pdo,pdo_config_t *ee_pdo,int pdo_size){
+	memcpy(pdo,ee_pdo,pdo_size);
+		// Have to manually set the function pointers.
+	if (pdo->cb_function_id == 1){
+		pdo->call_back = set_outputs;
+	}
+}
 // Used to poll hardware
 void hardware_monitoring(void){
-	read_inputs();
+//	read_inputs();
+}
+
+int8_t save_configuration(void){
+	int8_t result = 0;
+	if (can.save_settings == 1){
+		update_can_ee_pdo_config(&eeprom_storage.rpdo1,&can.rpdo1.config,sizeof(can.rpdo1.config));
+		update_can_ee_pdo_config(&eeprom_storage.rpdo2,&can.rpdo2.config,sizeof(can.rpdo2.config));
+		update_can_ee_pdo_config(&eeprom_storage.rpdo3,&can.rpdo3.config,sizeof(can.rpdo3.config));
+		update_can_ee_pdo_config(&eeprom_storage.rpdo4,&can.rpdo4.config,sizeof(can.rpdo4.config));
+
+		update_can_ee_pdo_config(&eeprom_storage.tpdo1,&can.tpdo1.config,sizeof(can.tpdo1.config));
+		update_can_ee_pdo_config(&eeprom_storage.tpdo2,&can.tpdo2.config,sizeof(can.tpdo2.config));
+		update_can_ee_pdo_config(&eeprom_storage.tpdo3,&can.tpdo3.config,sizeof(can.tpdo3.config));
+		update_can_ee_pdo_config(&eeprom_storage.tpdo4,&can.tpdo4.config,sizeof(can.tpdo4.config));
+		result = EE_Write();
+	}else if (can.save_settings == 2){
+		eeprom_storage.accel_x_offset = ICM42670P.accel_x_offset;
+		eeprom_storage.accel_y_offset = ICM42670P.accel_y_offset;
+		eeprom_storage.accel_z_offset = ICM42670P.accel_z_offset;
+
+		eeprom_storage.gyro_x_offset = ICM42670P.gyro_x_offset;
+		eeprom_storage.gyro_y_offset = ICM42670P.gyro_y_offset;
+		eeprom_storage.gyro_z_offset = ICM42670P.gyro_z_offset;
+
+		eeprom_storage.temperature_offset = ICM42670P.temperature_offset;
+		result = EE_Write();
+	}else if (can.save_settings == 255){
+			// Clear PDOs and save it to eeprom
+    	clear_pdo_config(&can.tpdo1);
+    	clear_pdo_config(&can.tpdo2);
+    	clear_pdo_config(&can.tpdo3);
+    	clear_pdo_config(&can.tpdo4);
+
+    	clear_pdo_config(&can.rpdo1);
+    	clear_pdo_config(&can.rpdo2);
+    	clear_pdo_config(&can.rpdo3);
+    	clear_pdo_config(&can.rpdo4);
+    	eeprom_storage.init_flag = 1;
+    	can.save_settings = 1;
+    	result = save_configuration();
+	}
+	can.save_settings = 0;
+	return result;
+}
+
+
+int8_t load_configuration(void){
+	EE_Read();
+	load_can_ee_pdo_config(&can.rpdo1.config,&eeprom_storage.rpdo1,sizeof(can.rpdo1.config));
+	load_can_ee_pdo_config(&can.rpdo2.config,&eeprom_storage.rpdo2,sizeof(can.rpdo2.config));
+	load_can_ee_pdo_config(&can.rpdo3.config,&eeprom_storage.rpdo3,sizeof(can.rpdo3.config));
+	load_can_ee_pdo_config(&can.rpdo4.config,&eeprom_storage.rpdo4,sizeof(can.rpdo4.config));
+
+	load_can_ee_pdo_config(&can.tpdo1.config,&eeprom_storage.tpdo1,sizeof(can.tpdo1.config));
+	load_can_ee_pdo_config(&can.tpdo2.config,&eeprom_storage.tpdo2,sizeof(can.tpdo2.config));
+	load_can_ee_pdo_config(&can.tpdo3.config,&eeprom_storage.tpdo3,sizeof(can.tpdo3.config));
+	load_can_ee_pdo_config(&can.tpdo4.config,&eeprom_storage.tpdo4,sizeof(can.tpdo4.config));
+
+	memset(can.rpdo1.config.number_of_bytes, 0, sizeof(can.rpdo1.config.number_of_bytes)); // Set all elements to 0
+	memset(can.rpdo2.config.number_of_bytes, 0, sizeof(can.rpdo2.config.number_of_bytes)); // Set all elements to 0
+	memset(can.rpdo3.config.number_of_bytes, 0, sizeof(can.rpdo3.config.number_of_bytes)); // Set all elements to 0
+	memset(can.rpdo4.config.number_of_bytes, 0, sizeof(can.rpdo4.config.number_of_bytes)); // Set all elements to 0
+	can.rpdo1.config.total_number_of_bytes = 0;
+	can.rpdo2.config.total_number_of_bytes = 0;
+	can.rpdo3.config.total_number_of_bytes = 0;
+	can.rpdo4.config.total_number_of_bytes = 0;
+
+	memset(can.tpdo1.config.number_of_bytes, 0, sizeof(can.tpdo1.config.number_of_bytes)); // Set all elements to 0
+	memset(can.tpdo2.config.number_of_bytes, 0, sizeof(can.tpdo2.config.number_of_bytes)); // Set all elements to 0
+	memset(can.tpdo3.config.number_of_bytes, 0, sizeof(can.tpdo3.config.number_of_bytes)); // Set all elements to 0
+	memset(can.tpdo4.config.number_of_bytes, 0, sizeof(can.tpdo4.config.number_of_bytes)); // Set all elements to 0
+	can.tpdo1.config.total_number_of_bytes = 0;
+	can.tpdo2.config.total_number_of_bytes = 0;
+	can.tpdo3.config.total_number_of_bytes = 0;
+	can.tpdo4.config.total_number_of_bytes = 0;
+
+
+		// Re-map variables for the payloads
+	for (int i = 0; i < sizeof(can.rpdo1.config.mapped_indices);i++){
+		if (can.rpdo1.config.mapped_indices[i] != 0) update_pdo_payload(&can.rpdo1,i);
+		if (can.rpdo2.config.mapped_indices[i] != 0) update_pdo_payload(&can.rpdo2,i);
+		if (can.rpdo3.config.mapped_indices[i] != 0) update_pdo_payload(&can.rpdo3,i);
+		if (can.rpdo4.config.mapped_indices[i] != 0) update_pdo_payload(&can.rpdo4,i);
+		if (can.tpdo1.config.mapped_indices[i] != 0) update_pdo_payload(&can.tpdo1,i);
+		if (can.tpdo2.config.mapped_indices[i] != 0) update_pdo_payload(&can.tpdo2,i);
+		if (can.tpdo3.config.mapped_indices[i] != 0) update_pdo_payload(&can.tpdo3,i);
+		if (can.tpdo4.config.mapped_indices[i] != 0) update_pdo_payload(&can.tpdo4,i);
+	}
+
+	ICM42670P.accel_x_offset = eeprom_storage.accel_x_offset;
+	ICM42670P.accel_y_offset = eeprom_storage.accel_y_offset;
+	ICM42670P.accel_z_offset = eeprom_storage.accel_z_offset;
+
+	ICM42670P.gyro_x_offset = eeprom_storage.gyro_x_offset;
+	ICM42670P.gyro_y_offset = eeprom_storage.gyro_y_offset;
+	ICM42670P.gyro_z_offset = eeprom_storage.gyro_z_offset;
+
+	ICM42670P.temperature_offset = eeprom_storage.temperature_offset;
+	return 1;
 }
 
 void reboot_device(void) {

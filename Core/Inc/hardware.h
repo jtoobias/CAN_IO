@@ -61,6 +61,7 @@ typedef struct{
 		volatile uint16_t output_value;
 	};
 
+	uint32_t last_save_config_check_time;
 	uint32_t last_can_state_check_time;
 	uint32_t last_can_msg_time;
 
@@ -68,6 +69,7 @@ typedef struct{
 }hardware_t;
 
 typedef struct{
+	uint8_t	init_flag;
 	pdo_config_t tpdo1;						// This holds the information for the Transmit pdo
 	pdo_config_t tpdo2;						// This holds the information for the Transmit pdo
 	pdo_config_t tpdo3;						// This holds the information for the Transmit pdo
@@ -77,6 +79,19 @@ typedef struct{
 	pdo_config_t rpdo2;						// This holds the information for the Receive pdo
 	pdo_config_t rpdo3;						// This holds the information for the Receive pdo
 	pdo_config_t rpdo4;						// This holds the information for the Receive pdo
+
+
+	int16_t gyro_x_offset;
+	int16_t gyro_y_offset;
+	int16_t gyro_z_offset;
+
+	int16_t accel_x_offset;
+	int16_t accel_y_offset;
+	int16_t accel_z_offset;
+	int16_t temperature_offset;
+
+	uint16_t can_id;
+	uint32_t baud_rate;
 
 }eeprom_storage_t;
 
@@ -93,7 +108,10 @@ extern eeprom_storage_t eeprom_storage;
 //Functions
 void hardware_init(CAN_HandleTypeDef *can_handler,SPI_HandleTypeDef *hSPI);
 void hardware_monitoring(void);
+int8_t save_configuration(void);
+int8_t load_configuration(void);
 void update_can_ee_pdo_config(pdo_config_t *ee_pdo,pdo_config_t *pdo,int pdo_size);
+void load_can_ee_pdo_config(pdo_config_t *pdo,pdo_config_t *ee_pdo,int pdo_size);
 
 uint32_t diff_ms_timer(uint32_t last_period);
 uint32_t get_ms_timer(void);
