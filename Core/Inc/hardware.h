@@ -61,6 +61,20 @@ typedef struct{
 		volatile uint16_t output_value;
 	};
 
+	union {
+		struct{
+			volatile uint16_t bit0		:1;
+			volatile uint16_t bit1		:1;
+			volatile uint16_t bit2		:1;
+			volatile uint16_t bit3		:1;
+			volatile uint16_t bit4		:1;
+			volatile uint16_t bit5		:1;
+			volatile uint16_t bit6		:1;
+			volatile uint16_t bit7		:1;
+		}wanted_output;
+		volatile uint16_t target_output_value;
+	};
+
 	uint32_t last_save_config_check_time;
 	uint32_t last_can_state_check_time;
 	uint32_t last_can_msg_time;

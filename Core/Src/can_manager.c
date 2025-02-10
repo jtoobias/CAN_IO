@@ -749,7 +749,7 @@ void rpdo_handler(pdo_config_t *rpdo_config,uint8_t *packet){
 		// Update variables so that they can be executed later when required
 		switch (index){
 			case OUTPUT_INDEX_OD:
-				hardware.output_value = (uint16_t)tmp_val;
+				hardware.target_output_value = (uint16_t)tmp_val;
 //				rpdo_config->call_back = set_outputs;
 //				rpdo_config->cb_function_id = 1;
 				break;
@@ -1066,7 +1066,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 				ICM42670P.temperature_offset += data;
 				break;
 			case OUTPUT_INDEX_OD:
-				hardware.output_value = data;
+				hardware.target_output_value = data;
 				set_outputs();
 				response[0] = CAN_SERVER_RESPONSE_SUCCESS;
 				*(int16_t*)&response[1] = index;
