@@ -156,6 +156,8 @@ int main(void)
 		  send_cyclic_pdo(&can.tpdo2);
 		  send_cyclic_pdo(&can.tpdo3);
 		  send_cyclic_pdo(&can.tpdo4);
+
+
 	  }
 
 	  if (diff_ms_timer(hardware.last_save_config_check_time) >= 500){

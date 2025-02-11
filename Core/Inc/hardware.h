@@ -80,6 +80,22 @@ typedef struct{
 	uint32_t last_can_msg_time;
 
 
+
+	union {
+		struct{
+			volatile uint8_t tpdo1		:1;
+			volatile uint8_t tpdo2		:1;
+			volatile uint8_t tpdo3		:1;
+			volatile uint8_t tpdo4		:1;
+			volatile uint8_t rpdo1		:1;
+			volatile uint8_t rpdo2		:1;
+			volatile uint8_t rpdo3		:1;
+			volatile uint8_t rpdo4		:1;
+		};
+		volatile uint8_t pdo_triggered_value;
+	};
+
+
 }hardware_t;
 
 typedef struct{

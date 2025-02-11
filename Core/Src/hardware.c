@@ -283,10 +283,10 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 		check_all_tpdos_for_analog_trigger(&can.tpdo3,&can,&ICM42670P);
 		check_all_tpdos_for_analog_trigger(&can.tpdo4,&can,&ICM42670P);
 
-		check_all_rpdos_for_analog_trigger(&can.tpdo1,&can,&ICM42670P);
-		check_all_rpdos_for_analog_trigger(&can.tpdo2,&can,&ICM42670P);
-		check_all_rpdos_for_analog_trigger(&can.tpdo3,&can,&ICM42670P);
-		check_all_rpdos_for_analog_trigger(&can.tpdo4,&can,&ICM42670P);
+		check_all_rpdos_for_analog_trigger(&can.rpdo1,&can,&ICM42670P);
+		check_all_rpdos_for_analog_trigger(&can.rpdo2,&can,&ICM42670P);
+		check_all_rpdos_for_analog_trigger(&can.rpdo3,&can,&ICM42670P);
+		check_all_rpdos_for_analog_trigger(&can.rpdo4,&can,&ICM42670P);
 
 	}
 }

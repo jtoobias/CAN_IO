@@ -274,51 +274,55 @@ int8_t check_analog_high_to_low_trigger(pdo_config_t* pdo_config,uint8_t trigger
 }
 
 // Manage PDO sends on analog triggers
-int8_t check_tpdo_triggered_by_analog(pdo_t* tpdo,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val){
+int8_t check_tpdo_triggered_by_analog(pdo_t* tpdo,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t *new_val,int16_t *last_val){
 	/*
 	 * Check if there is a trigger and direction and if the trigger occurs send
 	 */
 
-	if (check_analog_low_to_high_trigger(&tpdo->config,trigger_index,analog_threshold_index,new_val,last_val) ||
-		check_analog_high_to_low_trigger(&tpdo->config,trigger_index,analog_threshold_index,new_val,last_val)){
+	if (check_analog_low_to_high_trigger(&tpdo->config,trigger_index,analog_threshold_index,*new_val,*last_val) ||
+		check_analog_high_to_low_trigger(&tpdo->config,trigger_index,analog_threshold_index,*new_val,*last_val)){
 		send_pdo(tpdo);
+		*last_val = *new_val;
 		return TRUE;
 	}
+	*last_val = *new_val;
 	return FALSE;
 }
 
 // Manage PDO sends on analog triggers
-int8_t check_rpdo_triggered_by_analog(pdo_t* rpdo,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val){
+int8_t check_rpdo_triggered_by_analog(pdo_t* rpdo,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t *new_val,int16_t *last_val){
 	/*
 	 * Check if there is a trigger and direction and if the trigger occurs send
 	 */
 
-	if (check_analog_low_to_high_trigger(&rpdo->config,trigger_index,analog_threshold_index,new_val,last_val) ||
-		check_analog_high_to_low_trigger(&rpdo->config,trigger_index,analog_threshold_index,new_val,last_val)){
+	if (check_analog_low_to_high_trigger(&rpdo->config,trigger_index,analog_threshold_index,*new_val,*last_val) ||
+		check_analog_high_to_low_trigger(&rpdo->config,trigger_index,analog_threshold_index,*new_val,*last_val)){
 		rpdo->config.call_back();
+		*last_val = *new_val;
 		return TRUE;
 	}
+	*last_val = *new_val;
 	return FALSE;
 }
 
 void check_all_tpdos_for_analog_trigger(pdo_t* tpdo,can_t* can_ptr,ICM42670P_t *imu_ptr){
 
-	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_X, ANALOG_THRESHOLD_INDEX_GYRO_X, imu_ptr->gyro_x_conv, can_ptr->last_gyro_x);
-	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_Y, ANALOG_THRESHOLD_INDEX_GYRO_Y, imu_ptr->gyro_y_conv, can_ptr->last_gyro_y);
-	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_Z, ANALOG_THRESHOLD_INDEX_GYRO_Z, imu_ptr->gyro_z_conv, can_ptr->last_gyro_z);
-	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_X, ANALOG_THRESHOLD_INDEX_ACCEL_X, imu_ptr->accel_x_conv, can_ptr->last_accel_x);
-	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_Y, ANALOG_THRESHOLD_INDEX_ACCEL_Y, imu_ptr->accel_y_conv, can_ptr->last_accel_y);
-	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_Z, ANALOG_THRESHOLD_INDEX_ACCEL_Z, imu_ptr->accel_z_conv, can_ptr->last_accel_z);
+	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_X, ANALOG_THRESHOLD_INDEX_GYRO_X, &imu_ptr->gyro_x_conv, &can_ptr->last_gyro_x);
+	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_Y, ANALOG_THRESHOLD_INDEX_GYRO_Y, &imu_ptr->gyro_y_conv, &can_ptr->last_gyro_y);
+	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_Z, ANALOG_THRESHOLD_INDEX_GYRO_Z, &imu_ptr->gyro_z_conv, &can_ptr->last_gyro_z);
+	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_X, ANALOG_THRESHOLD_INDEX_ACCEL_X, &imu_ptr->accel_x_conv, &can_ptr->last_accel_x);
+	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_Y, ANALOG_THRESHOLD_INDEX_ACCEL_Y, &imu_ptr->accel_y_conv, &can_ptr->last_accel_y);
+	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_Z, ANALOG_THRESHOLD_INDEX_ACCEL_Z, &imu_ptr->accel_z_conv, &can_ptr->last_accel_z);
 }
 
 void check_all_rpdos_for_analog_trigger(pdo_t* rpdo,can_t* can_ptr,ICM42670P_t *imu_ptr){
 
-	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_GYRO_X, ANALOG_THRESHOLD_INDEX_GYRO_X, imu_ptr->gyro_x_conv, can_ptr->last_gyro_x);
-	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_GYRO_Y, ANALOG_THRESHOLD_INDEX_GYRO_Y, imu_ptr->gyro_y_conv, can_ptr->last_gyro_y);
-	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_GYRO_Z, ANALOG_THRESHOLD_INDEX_GYRO_Z, imu_ptr->gyro_z_conv, can_ptr->last_gyro_z);
-	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_ACCEL_X, ANALOG_THRESHOLD_INDEX_ACCEL_X, imu_ptr->accel_x_conv, can_ptr->last_accel_x);
-	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_ACCEL_Y, ANALOG_THRESHOLD_INDEX_ACCEL_Y, imu_ptr->accel_y_conv, can_ptr->last_accel_y);
-	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_ACCEL_Z, ANALOG_THRESHOLD_INDEX_ACCEL_Z, imu_ptr->accel_z_conv, can_ptr->last_accel_z);
+	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_GYRO_X, ANALOG_THRESHOLD_INDEX_GYRO_X, &imu_ptr->gyro_x_conv, &can_ptr->last_gyro_x);
+	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_GYRO_Y, ANALOG_THRESHOLD_INDEX_GYRO_Y, &imu_ptr->gyro_y_conv, &can_ptr->last_gyro_y);
+	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_GYRO_Z, ANALOG_THRESHOLD_INDEX_GYRO_Z, &imu_ptr->gyro_z_conv, &can_ptr->last_gyro_z);
+	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_ACCEL_X, ANALOG_THRESHOLD_INDEX_ACCEL_X, &imu_ptr->accel_x_conv, &can_ptr->last_accel_x);
+	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_ACCEL_Y, ANALOG_THRESHOLD_INDEX_ACCEL_Y, &imu_ptr->accel_y_conv, &can_ptr->last_accel_y);
+	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_ACCEL_Z, ANALOG_THRESHOLD_INDEX_ACCEL_Z, &imu_ptr->accel_z_conv, &can_ptr->last_accel_z);
 }
 
 
@@ -862,6 +866,10 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 			case TPDO2_ANALOG_THRESHOLDS_OD:
 			case TPDO3_ANALOG_THRESHOLDS_OD:
 			case TPDO4_ANALOG_THRESHOLDS_OD:
+			case RPDO1_ANALOG_THRESHOLDS_OD:
+			case RPDO2_ANALOG_THRESHOLDS_OD:
+			case RPDO3_ANALOG_THRESHOLDS_OD:
+			case RPDO4_ANALOG_THRESHOLDS_OD:
 				response[0] = CAN_SERVER_RESPONSE_SUCCESS;
 				*(int16_t*)&response[1] = index;
 				response[3] = sub_index;
@@ -870,8 +878,12 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 				else if (index == TPDO2_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo2.config;
 				else if (index == TPDO3_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo3.config;
 				else if (index == TPDO4_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo4.config;
+				else if (index == RPDO1_ANALOG_THRESHOLDS_OD) pdo_config = &can.rpdo1.config;
+				else if (index == RPDO2_ANALOG_THRESHOLDS_OD) pdo_config = &can.rpdo2.config;
+				else if (index == RPDO3_ANALOG_THRESHOLDS_OD) pdo_config = &can.rpdo3.config;
+				else if (index == RPDO4_ANALOG_THRESHOLDS_OD) pdo_config = &can.rpdo4.config;
 				else break;
-				pdo_config->analog_thresholds[(sub_index-1)] = (int16_t)(data & 0x0000FFFF);
+				pdo_config->analog_thresholds[(sub_index-1)] = (int32_t)(data & 0x0000FFFF)*100;
 				break;
 
 				// Get trigger directions
@@ -879,6 +891,10 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 			case TPDO2_TRIGGER_DIRS_OD:
 			case TPDO3_TRIGGER_DIRS_OD:
 			case TPDO4_TRIGGER_DIRS_OD:
+			case RPDO1_TRIGGER_DIRS_OD:
+			case RPDO2_TRIGGER_DIRS_OD:
+			case RPDO3_TRIGGER_DIRS_OD:
+			case RPDO4_TRIGGER_DIRS_OD:
 				response[0] = CAN_SERVER_RESPONSE_SUCCESS;
 				*(int16_t*)&response[1] = index;
 				response[3] = sub_index;
@@ -887,6 +903,10 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 				else if (index == TPDO2_TRIGGER_DIRS_OD) pdo_config = &can.tpdo2.config;
 				else if (index == TPDO3_TRIGGER_DIRS_OD) pdo_config = &can.tpdo3.config;
 				else if (index == TPDO4_TRIGGER_DIRS_OD) pdo_config = &can.tpdo4.config;
+				else if (index == RPDO1_TRIGGER_DIRS_OD) pdo_config = &can.rpdo1.config;
+				else if (index == RPDO2_TRIGGER_DIRS_OD) pdo_config = &can.rpdo2.config;
+				else if (index == RPDO3_TRIGGER_DIRS_OD) pdo_config = &can.rpdo3.config;
+				else if (index == RPDO4_TRIGGER_DIRS_OD) pdo_config = &can.rpdo4.config;
 				else break;
 				if (sub_index == 0x0F){
 					// Wrong
@@ -950,7 +970,6 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 						default:
 								// Shouldn't reach here
 							break;
-
 						}
 
 						break;
@@ -1225,6 +1244,140 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 					response[3] = sub_index;
 					*(uint8_t*)&response[4] = can.state;
 					response_len = 5;
+					break;
+
+				case RPDO1_COMM_PARAM_OD:
+				case RPDO2_COMM_PARAM_OD:
+				case RPDO3_COMM_PARAM_OD:
+				case RPDO4_COMM_PARAM_OD:
+				case TPDO1_COMM_PARAM_OD:
+				case TPDO2_COMM_PARAM_OD:
+				case TPDO3_COMM_PARAM_OD:
+				case TPDO4_COMM_PARAM_OD:
+					response[0] = RD_SERVER_RESPONSE_CMD_4_BYTE;
+					*(int16_t*)&response[1] = index;
+					if (index == RPDO1_COMM_PARAM_OD) pdo_config = &can.rpdo1.config;
+					else if (index == RPDO2_COMM_PARAM_OD) pdo_config = &can.rpdo2.config;
+					else if (index == RPDO3_COMM_PARAM_OD) pdo_config = &can.rpdo3.config;
+					else if (index == RPDO4_COMM_PARAM_OD) pdo_config = &can.rpdo4.config;
+					else if (index == TPDO1_COMM_PARAM_OD) pdo_config = &can.tpdo1.config;
+					else if (index == TPDO2_COMM_PARAM_OD) pdo_config = &can.tpdo2.config;
+					else if (index == TPDO3_COMM_PARAM_OD) pdo_config = &can.tpdo3.config;
+					else if (index == TPDO4_COMM_PARAM_OD) pdo_config = &can.tpdo4.config;
+					else break;	// Shouldn't happen
+
+					response[3] = sub_index;
+					switch (sub_index){
+						case PDO_COMM_PARAM_COB_ID_SUBINDEX_OD:
+							*(uint32_t*)&response[4] = __REV(pdo_config->_cob_id);
+							response_len = 8;
+							break;
+						case PDO_COMM_PARAM_TRANS_TYPE_SUBINDEX_OD:
+							response[0] = RD_SERVER_RESPONSE_CMD_1_BYTE;
+							*(uint8_t*)&response[4] = pdo_config->transmission_type;
+							response_len = 5;
+							break;
+						case PDO_COMM_PARAM_INHIBIT_TIME_SUBINDEX_OD:
+							// Send the inhibit time
+							*(uint32_t*)&response[4] = __REV(pdo_config->inhibit_time);
+							response_len = 8;
+							break;
+	//					case PDO_COMM_PARAM_RESERVED_SUBINDEX:
+	//						break;
+						case PDO_COMM_PARAM_EVENT_TIMER_SUBINDEX_OD:
+							// Send the update period
+							*(uint32_t*)&response[4] = __REV(pdo_config->transmit_period);
+							response_len = 8;
+							break;
+						default:
+							// shouldn't come here
+							break;
+					}
+					break;
+					// Get analog trigger values
+				case TPDO1_ANALOG_THRESHOLDS_OD:
+				case TPDO2_ANALOG_THRESHOLDS_OD:
+				case TPDO3_ANALOG_THRESHOLDS_OD:
+				case TPDO4_ANALOG_THRESHOLDS_OD:
+					response[0] = CAN_SERVER_RESPONSE_SUCCESS;
+					*(int16_t*)&response[1] = index;
+					response[3] = sub_index;
+					if (index == TPDO1_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo1.config;
+					else if (index == TPDO2_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo2.config;
+					else if (index == TPDO3_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo3.config;
+					else if (index == TPDO4_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo4.config;
+					else break;
+					response[0] = RD_SERVER_RESPONSE_CMD_2_BYTE;
+					*(int16_t*)&response[4] = __REV16(pdo_config->analog_thresholds[(sub_index-1)]);
+					response_len = 6;
+					break;
+
+					// Get trigger directions
+				case TPDO1_TRIGGER_DIRS_OD:
+				case TPDO2_TRIGGER_DIRS_OD:
+				case TPDO3_TRIGGER_DIRS_OD:
+				case TPDO4_TRIGGER_DIRS_OD:
+					if (index == TPDO1_TRIGGER_DIRS_OD) pdo_config = &can.tpdo1.config;
+					else if (index == TPDO2_TRIGGER_DIRS_OD) pdo_config = &can.tpdo2.config;
+					else if (index == TPDO3_TRIGGER_DIRS_OD) pdo_config = &can.tpdo3.config;
+					else if (index == TPDO4_TRIGGER_DIRS_OD) pdo_config = &can.tpdo4.config;
+					else break;
+					if (sub_index == 0x0F){
+						// Wrong
+					}
+
+					response[0] = RD_SERVER_RESPONSE_CMD_1_BYTE;
+					*(int16_t*)&response[1] = index;
+					response[3] = sub_index;
+					// Send the trigger value
+					*(uint8_t*)&response[4] = pdo_config->triggers[(sub_index-1)];
+					response_len = 5;
+					break;
+
+					// Mapping indices to PDO's
+				case RPDO1_MAPPING_PARAM_OD:
+				case RPDO2_MAPPING_PARAM_OD:
+				case RPDO3_MAPPING_PARAM_OD:
+				case RPDO4_MAPPING_PARAM_OD:
+				case TPDO1_MAPPING_PARAM_OD:
+				case TPDO2_MAPPING_PARAM_OD:
+				case TPDO3_MAPPING_PARAM_OD:
+				case TPDO4_MAPPING_PARAM_OD:
+					response[0] = RD_SERVER_RESPONSE_CMD_4_BYTE;
+					*(int16_t*)&response[1] = index;
+					if (index == RPDO1_MAPPING_PARAM_OD) pdo_config = &can.rpdo1.config;
+					else if (index == RPDO2_MAPPING_PARAM_OD) pdo_config = &can.rpdo2.config;
+					else if (index == RPDO3_MAPPING_PARAM_OD) pdo_config = &can.rpdo3.config;
+					else if (index == RPDO4_MAPPING_PARAM_OD) pdo_config = &can.rpdo4.config;
+					else if (index == TPDO1_MAPPING_PARAM_OD) pdo_config = &can.tpdo1.config;
+					else if (index == TPDO2_MAPPING_PARAM_OD) pdo_config = &can.tpdo2.config;
+					else if (index == TPDO3_MAPPING_PARAM_OD) pdo_config = &can.tpdo3.config;
+					else if (index == TPDO4_MAPPING_PARAM_OD) pdo_config = &can.tpdo4.config;
+					else break;	// Shouldn't happen
+
+					response[3] = sub_index;
+					switch (sub_index){
+						case PDO_MAPPING_SUBINDEX_NUM_ENTRIES_OD:
+
+							break;
+						case PDO_MAPPING_SUBINDEX_ENTRY_1_OD:
+						case PDO_MAPPING_SUBINDEX_ENTRY_2_OD:
+						case PDO_MAPPING_SUBINDEX_ENTRY_3_OD:
+						case PDO_MAPPING_SUBINDEX_ENTRY_4_OD:
+						case PDO_MAPPING_SUBINDEX_ENTRY_5_OD:
+						case PDO_MAPPING_SUBINDEX_ENTRY_6_OD:
+						case PDO_MAPPING_SUBINDEX_ENTRY_7_OD:
+						case PDO_MAPPING_SUBINDEX_ENTRY_8_OD:
+
+							// Send the Mapped indices value
+							*(uint32_t*)&response[4] = __REV(pdo_config->mapped_indices[(sub_index-1)]);
+							response_len = 8;
+
+							break;
+						default:
+							// shouldn't come here
+							break;
+					}
 					break;
 
 			default:

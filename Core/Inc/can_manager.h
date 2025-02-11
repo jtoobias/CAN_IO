@@ -99,18 +99,26 @@
 // TPDO1 Analog Thresholds and Trigger Directions
 #define TPDO1_ANALOG_THRESHOLDS_OD    	0x2000
 #define TPDO1_TRIGGER_DIRS_OD  			0x2001
+#define RPDO1_ANALOG_THRESHOLDS_OD    	0x2002
+#define RPDO1_TRIGGER_DIRS_OD  			0x2003
 
 // TPDO2 Analog Thresholds and Trigger Directions
 #define TPDO2_ANALOG_THRESHOLDS_OD    	0x2010
 #define TPDO2_TRIGGER_DIRS_OD  			0x2011
+#define RPDO2_ANALOG_THRESHOLDS_OD    	0x2012
+#define RPDO2_TRIGGER_DIRS_OD  			0x2013
 
 // TPDO3 Analog Thresholds and Trigger Directions
 #define TPDO3_ANALOG_THRESHOLDS_OD   	0x2020
 #define TPDO3_TRIGGER_DIRS_OD  			0x2021
+#define RPDO3_ANALOG_THRESHOLDS_OD    	0x2022
+#define RPDO3_TRIGGER_DIRS_OD  			0x2023
 
 // TPDO4 Analog Thresholds and Trigger Directions
 #define TPDO4_ANALOG_THRESHOLDS_OD    	0x2030
 #define TPDO4_TRIGGER_DIRS_OD  			0x2031
+#define RPDO4_ANALOG_THRESHOLDS_OD    	0x2032
+#define RPDO4_TRIGGER_DIRS_OD  			0x2033
 
 // Trigger sub_indices
 #define TRIGGER_IN_1_SUBINDEX_OD		0x01
@@ -355,7 +363,7 @@ typedef struct{
 	uint8_t triggers[PDO_NUMBER_OF_TRIGGERS];	// Represents a specific input (8 Digital I/O, 6 Analog = 3 Gyro,3 Accel)
 												// 0=Off, 1=low->high, 2=high->low, 3=both, (This array is in order. DIO 1->8,xyzGyro,xyzAccel)
 
-	int16_t analog_thresholds[PDO_NUMBER_OF_ANALOG_TRIGGERS];				// Thresholds for analog trigger
+	int32_t analog_thresholds[PDO_NUMBER_OF_ANALOG_TRIGGERS];				// Thresholds for analog trigger
 
 
     // Function pointer for a function taking (void) and returning void
@@ -372,6 +380,7 @@ typedef struct {
 	int8_t cos_occured;
 	pdo_config_t config;
 	uint8_t sync_count;
+//	uint8_t triggered;
 
 }pdo_t;
 
@@ -465,7 +474,8 @@ int8_t tpdo_input_check_and_send(pdo_t* tpdo,uint8_t input_index,uint8_t new_val
 int8_t rpdo_input_check_and_send(pdo_t* rpdo,uint8_t input_index,uint8_t new_val);
 int8_t check_analog_low_to_high_trigger(pdo_config_t* tpdo_config,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val);
 int8_t check_analog_high_to_low_trigger(pdo_config_t* tpdo_config,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val);
-int8_t check_pdo_triggered_by_analog(pdo_t* pdo,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val);
+int8_t check_rpdo_triggered_by_analog(pdo_t* rpdo,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t *new_val,int16_t *last_val);
+int8_t check_tpdo_triggered_by_analog(pdo_t* tpdo,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t *new_val,int16_t *last_val);
 void check_all_tpdos_for_analog_trigger(pdo_t* pdo,can_t* can_ptr,ICM42670P_t *imu_ptr);
 void check_all_rpdos_for_analog_trigger(pdo_t* rpdo,can_t* can_ptr,ICM42670P_t *imu_ptr);
 void rpdo_handler(pdo_config_t *rpdo_config,uint8_t *packet);
