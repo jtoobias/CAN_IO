@@ -6,6 +6,9 @@
  */
 #include "can_manager.h"
 #include <string.h>
+#include <stdint.h>
+#include <limits.h>
+
 #include "main.h"
 #include "hardware.h"
 
@@ -119,7 +122,7 @@ void clear_pdo_config(pdo_t *pdo){
 	pdo->config.transmission_type = 250; // UNKNOWN type
 
 	memset(pdo->config.triggers, DISABLE, sizeof(pdo->config.triggers)); // Set all elements to 0
-	memset(pdo->config.analog_thresholds, 0, sizeof(pdo->config.analog_thresholds)); // Set all elements to 0
+	memset(pdo->config.analog_thresholds, INT_MAX, sizeof(pdo->config.analog_thresholds)); // Set all elements to 0
 
 	memset(pdo->config.mapped_indices, 0, sizeof(pdo->config.mapped_indices)); // Set all elements to 0
 
@@ -274,55 +277,53 @@ int8_t check_analog_high_to_low_trigger(pdo_config_t* pdo_config,uint8_t trigger
 }
 
 // Manage PDO sends on analog triggers
-int8_t check_tpdo_triggered_by_analog(pdo_t* tpdo,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t *new_val,int16_t *last_val){
+int8_t check_tpdo_triggered_by_analog(pdo_t* tpdo,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val){
 	/*
 	 * Check if there is a trigger and direction and if the trigger occurs send
 	 */
 
-	if (check_analog_low_to_high_trigger(&tpdo->config,trigger_index,analog_threshold_index,*new_val,*last_val) ||
-		check_analog_high_to_low_trigger(&tpdo->config,trigger_index,analog_threshold_index,*new_val,*last_val)){
+	if (check_analog_low_to_high_trigger(&tpdo->config,trigger_index,analog_threshold_index,new_val,last_val) ||
+		check_analog_high_to_low_trigger(&tpdo->config,trigger_index,analog_threshold_index,new_val,last_val)){
 		send_pdo(tpdo);
-		*last_val = *new_val;
+		last_val = new_val;
 		return TRUE;
 	}
-	*last_val = *new_val;
+	last_val = new_val;
 	return FALSE;
 }
 
 // Manage PDO sends on analog triggers
-int8_t check_rpdo_triggered_by_analog(pdo_t* rpdo,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t *new_val,int16_t *last_val){
+int8_t check_rpdo_triggered_by_analog(pdo_t* rpdo,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val){
 	/*
 	 * Check if there is a trigger and direction and if the trigger occurs send
 	 */
 
-	if (check_analog_low_to_high_trigger(&rpdo->config,trigger_index,analog_threshold_index,*new_val,*last_val) ||
-		check_analog_high_to_low_trigger(&rpdo->config,trigger_index,analog_threshold_index,*new_val,*last_val)){
+	if (check_analog_low_to_high_trigger(&rpdo->config,trigger_index,analog_threshold_index,new_val,last_val) ||
+		check_analog_high_to_low_trigger(&rpdo->config,trigger_index,analog_threshold_index,new_val,last_val)){
 		rpdo->config.call_back();
-		*last_val = *new_val;
 		return TRUE;
 	}
-	*last_val = *new_val;
 	return FALSE;
 }
 
 void check_all_tpdos_for_analog_trigger(pdo_t* tpdo,can_t* can_ptr,ICM42670P_t *imu_ptr){
 
-	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_X, ANALOG_THRESHOLD_INDEX_GYRO_X, &imu_ptr->gyro_x_conv, &can_ptr->last_gyro_x);
-	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_Y, ANALOG_THRESHOLD_INDEX_GYRO_Y, &imu_ptr->gyro_y_conv, &can_ptr->last_gyro_y);
-	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_Z, ANALOG_THRESHOLD_INDEX_GYRO_Z, &imu_ptr->gyro_z_conv, &can_ptr->last_gyro_z);
-	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_X, ANALOG_THRESHOLD_INDEX_ACCEL_X, &imu_ptr->accel_x_conv, &can_ptr->last_accel_x);
-	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_Y, ANALOG_THRESHOLD_INDEX_ACCEL_Y, &imu_ptr->accel_y_conv, &can_ptr->last_accel_y);
-	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_Z, ANALOG_THRESHOLD_INDEX_ACCEL_Z, &imu_ptr->accel_z_conv, &can_ptr->last_accel_z);
+	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_X, ANALOG_THRESHOLD_INDEX_GYRO_X, imu_ptr->gyro_x_conv, can_ptr->last_gyro_x);
+	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_Y, ANALOG_THRESHOLD_INDEX_GYRO_Y, imu_ptr->gyro_y_conv, can_ptr->last_gyro_y);
+	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_GYRO_Z, ANALOG_THRESHOLD_INDEX_GYRO_Z, imu_ptr->gyro_z_conv, can_ptr->last_gyro_z);
+	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_X, ANALOG_THRESHOLD_INDEX_ACCEL_X, imu_ptr->accel_x_conv, can_ptr->last_accel_x);
+	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_Y, ANALOG_THRESHOLD_INDEX_ACCEL_Y, imu_ptr->accel_y_conv, can_ptr->last_accel_y);
+	check_tpdo_triggered_by_analog(tpdo, TRIGGER_INDEX_ACCEL_Z, ANALOG_THRESHOLD_INDEX_ACCEL_Z, imu_ptr->accel_z_conv, can_ptr->last_accel_z);
 }
 
 void check_all_rpdos_for_analog_trigger(pdo_t* rpdo,can_t* can_ptr,ICM42670P_t *imu_ptr){
 
-	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_GYRO_X, ANALOG_THRESHOLD_INDEX_GYRO_X, &imu_ptr->gyro_x_conv, &can_ptr->last_gyro_x);
-	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_GYRO_Y, ANALOG_THRESHOLD_INDEX_GYRO_Y, &imu_ptr->gyro_y_conv, &can_ptr->last_gyro_y);
-	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_GYRO_Z, ANALOG_THRESHOLD_INDEX_GYRO_Z, &imu_ptr->gyro_z_conv, &can_ptr->last_gyro_z);
-	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_ACCEL_X, ANALOG_THRESHOLD_INDEX_ACCEL_X, &imu_ptr->accel_x_conv, &can_ptr->last_accel_x);
-	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_ACCEL_Y, ANALOG_THRESHOLD_INDEX_ACCEL_Y, &imu_ptr->accel_y_conv, &can_ptr->last_accel_y);
-	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_ACCEL_Z, ANALOG_THRESHOLD_INDEX_ACCEL_Z, &imu_ptr->accel_z_conv, &can_ptr->last_accel_z);
+	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_GYRO_X, ANALOG_THRESHOLD_INDEX_GYRO_X, imu_ptr->gyro_x_conv, can_ptr->last_gyro_x);
+	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_GYRO_Y, ANALOG_THRESHOLD_INDEX_GYRO_Y, imu_ptr->gyro_y_conv, can_ptr->last_gyro_y);
+	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_GYRO_Z, ANALOG_THRESHOLD_INDEX_GYRO_Z, imu_ptr->gyro_z_conv, can_ptr->last_gyro_z);
+	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_ACCEL_X, ANALOG_THRESHOLD_INDEX_ACCEL_X, imu_ptr->accel_x_conv, can_ptr->last_accel_x);
+	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_ACCEL_Y, ANALOG_THRESHOLD_INDEX_ACCEL_Y, imu_ptr->accel_y_conv, can_ptr->last_accel_y);
+	check_rpdo_triggered_by_analog(rpdo, TRIGGER_INDEX_ACCEL_Z, ANALOG_THRESHOLD_INDEX_ACCEL_Z, imu_ptr->accel_z_conv, can_ptr->last_accel_z);
 }
 
 
@@ -1308,7 +1309,7 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 					else if (index == TPDO4_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo4.config;
 					else break;
 					response[0] = RD_SERVER_RESPONSE_CMD_2_BYTE;
-					*(int16_t*)&response[4] = __REV16(pdo_config->analog_thresholds[(sub_index-1)]);
+					*(int16_t*)&response[4] = __REV16(pdo_config->analog_thresholds[(sub_index-1)]/100);
 					response_len = 6;
 					break;
 

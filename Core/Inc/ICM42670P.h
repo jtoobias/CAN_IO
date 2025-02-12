@@ -75,6 +75,7 @@
 typedef struct {
 
 	SPI_HandleTypeDef *SPI_handler;
+		// These might need to be changed to int32 or change the res
 	int16_t gyro_x_offset;
 	int16_t gyro_y_offset;
 	int16_t gyro_z_offset;

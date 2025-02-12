@@ -287,6 +287,12 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 		check_all_rpdos_for_analog_trigger(&can.rpdo2,&can,&ICM42670P);
 		check_all_rpdos_for_analog_trigger(&can.rpdo3,&can,&ICM42670P);
 		check_all_rpdos_for_analog_trigger(&can.rpdo4,&can,&ICM42670P);
+		can.last_accel_x = ICM42670P.accel_x_conv;
+		can.last_accel_y = ICM42670P.accel_y_conv;
+		can.last_accel_z = ICM42670P.accel_z_conv;
+		can.last_gyro_x = ICM42670P.gyro_x_conv;
+		can.last_gyro_y = ICM42670P.gyro_y_conv;
+		can.last_gyro_z = ICM42670P.gyro_z_conv;
 
 	}
 }
