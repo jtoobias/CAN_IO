@@ -113,6 +113,7 @@ void clear_pdo_config(pdo_t *pdo){
 	memset(pdo->config.number_of_bytes, 0, sizeof(pdo->config.number_of_bytes)); // Set all elements to 0
 	pdo->config.total_number_of_bytes = 0;
 	pdo->sync_count = 0;
+	pdo->target_action_value = 0;
 	pdo->config.inhibit_time = 0;
 	pdo->config.last_send_time = get_ms_timer();
 	pdo->config.transmit_period = 0;
@@ -300,6 +301,7 @@ int8_t check_rpdo_triggered_by_analog(pdo_t* rpdo,uint8_t trigger_index, uint8_t
 
 	if (check_analog_low_to_high_trigger(&rpdo->config,trigger_index,analog_threshold_index,new_val,last_val) ||
 		check_analog_high_to_low_trigger(&rpdo->config,trigger_index,analog_threshold_index,new_val,last_val)){
+		hardware.target_output_value = rpdo->target_action_value;
 		rpdo->config.call_back();
 		return TRUE;
 	}
@@ -660,16 +662,16 @@ void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *can_handler){
 //    	can.rx_header.DLC
     	switch (cob_id){
 			case RPDO1:
-				rpdo_handler(&can.rpdo1.config,can.rx_data_buffer);
+				rpdo_handler(&can.rpdo1,can.rx_data_buffer);
 				break;
 			case RPDO2:
-				rpdo_handler(&can.rpdo2.config,can.rx_data_buffer);
+				rpdo_handler(&can.rpdo2,can.rx_data_buffer);
 				break;
 			case RPDO3:
-				rpdo_handler(&can.rpdo3.config,can.rx_data_buffer);
+				rpdo_handler(&can.rpdo3,can.rx_data_buffer);
 				break;
 			case RPDO4:
-				rpdo_handler(&can.rpdo4.config,can.rx_data_buffer);
+				rpdo_handler(&can.rpdo4,can.rx_data_buffer);
 				break;
     		case RSDO:
     			sdo_handler(can.rx_data_buffer,can.rx_header.DLC);
@@ -713,23 +715,23 @@ void nmt_handler(uint8_t *packet,uint32_t len){
 	}
 }
 
-void rpdo_handler(pdo_config_t *rpdo_config,uint8_t *packet){
+void rpdo_handler(pdo_t *rpdo,uint8_t *packet){
 
-	if (rpdo_config->_cob_id & PDO_DISABLED_COB_ID) return;
+	if (rpdo->config._cob_id & PDO_DISABLED_COB_ID) return;
 		// Don't send if the time since last send is less than the inhibit period
-	if (diff_ms_timer(rpdo_config->last_send_time) < rpdo_config->inhibit_time) return;
-	rpdo_config->last_send_time = get_ms_timer();
+	if (diff_ms_timer(rpdo->config.last_send_time) < rpdo->config.inhibit_time) return;
+	rpdo->config.last_send_time = get_ms_timer();
 	uint8_t payload_index = 0;
 		// Need to loop through the mapped indices for the RPDO1
-	for (int i = 0; i < sizeof(rpdo_config->number_of_bytes);i++){
+	for (int i = 0; i < sizeof(rpdo->config.number_of_bytes);i++){
 		// Using the index and sub index get the data from the payload and store in the correct variables
 		int32_t tmp_val = 0;
 		uint32_t index = 0;
 //		uint32_t sub_index = 0;
 		// exit if variable is not setup
-		if (rpdo_config->number_of_bytes[i] == 0) break;
+		if (rpdo->config.number_of_bytes[i] == 0) break;
 			// Add variable to the array
-		switch (rpdo_config->number_of_bytes[i]){
+		switch (rpdo->config.number_of_bytes[i]){
 			case PDO_NUMBER_OF_BYTES_1:
 				tmp_val = (int32_t)(*((int8_t*)packet+payload_index));
 				payload_index ++;
@@ -748,13 +750,14 @@ void rpdo_handler(pdo_config_t *rpdo_config,uint8_t *packet){
 		}
 //		if (rpdo->config.mapped_indices[i] == (OUTPUT_INDEX_OD<<8|OUTPUT_SUBINDEX_OD))
 		// get the index and sub-index
-		index = rpdo_config->mapped_indices[i]>>16;
+		index = rpdo->config.mapped_indices[i]>>16;
 //		sub_index = (rpdo_config->mapped_indices[i]>>8) & 0xFF;
 		// Only outputs are mappable but build it so it can be extended.
 		// Update variables so that they can be executed later when required
 		switch (index){
 			case OUTPUT_INDEX_OD:
-				hardware.target_output_value = (uint16_t)tmp_val;
+				rpdo->target_action_value = (uint16_t)tmp_val;
+
 //				rpdo_config->call_back = set_outputs;
 //				rpdo_config->cb_function_id = 1;
 				break;
@@ -928,8 +931,12 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 			case TPDO4_MAPPING_PARAM_OD:
 				response[0] = CAN_SERVER_RESPONSE_SUCCESS;
 				*(int16_t*)&response[1] = index;
-				if (index == RPDO1_MAPPING_PARAM_OD) pdo = &can.rpdo1;
-				else if (index == RPDO2_MAPPING_PARAM_OD) pdo = &can.rpdo2;
+				if (index == RPDO1_MAPPING_PARAM_OD) {
+					pdo = &can.rpdo1;
+				}
+				else if (index == RPDO2_MAPPING_PARAM_OD) {
+					pdo = &can.rpdo2;
+				}
 				else if (index == RPDO3_MAPPING_PARAM_OD) pdo = &can.rpdo3;
 				else if (index == RPDO4_MAPPING_PARAM_OD) pdo = &can.rpdo4;
 				else if (index == TPDO1_MAPPING_PARAM_OD) pdo = &can.tpdo1;
@@ -1300,6 +1307,10 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 				case TPDO2_ANALOG_THRESHOLDS_OD:
 				case TPDO3_ANALOG_THRESHOLDS_OD:
 				case TPDO4_ANALOG_THRESHOLDS_OD:
+				case RPDO1_ANALOG_THRESHOLDS_OD:
+				case RPDO2_ANALOG_THRESHOLDS_OD:
+				case RPDO3_ANALOG_THRESHOLDS_OD:
+				case RPDO4_ANALOG_THRESHOLDS_OD:
 					response[0] = CAN_SERVER_RESPONSE_SUCCESS;
 					*(int16_t*)&response[1] = index;
 					response[3] = sub_index;
@@ -1307,6 +1318,10 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 					else if (index == TPDO2_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo2.config;
 					else if (index == TPDO3_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo3.config;
 					else if (index == TPDO4_ANALOG_THRESHOLDS_OD) pdo_config = &can.tpdo4.config;
+					else if (index == RPDO1_ANALOG_THRESHOLDS_OD) pdo_config = &can.rpdo1.config;
+					else if (index == RPDO2_ANALOG_THRESHOLDS_OD) pdo_config = &can.rpdo2.config;
+					else if (index == RPDO3_ANALOG_THRESHOLDS_OD) pdo_config = &can.rpdo3.config;
+					else if (index == RPDO4_ANALOG_THRESHOLDS_OD) pdo_config = &can.rpdo4.config;
 					else break;
 					response[0] = RD_SERVER_RESPONSE_CMD_2_BYTE;
 					*(int16_t*)&response[4] = __REV16(pdo_config->analog_thresholds[(sub_index-1)]/100);
@@ -1318,10 +1333,18 @@ void sdo_handler(uint8_t *packet,uint32_t len){
 				case TPDO2_TRIGGER_DIRS_OD:
 				case TPDO3_TRIGGER_DIRS_OD:
 				case TPDO4_TRIGGER_DIRS_OD:
+				case RPDO1_TRIGGER_DIRS_OD:
+				case RPDO2_TRIGGER_DIRS_OD:
+				case RPDO3_TRIGGER_DIRS_OD:
+				case RPDO4_TRIGGER_DIRS_OD:
 					if (index == TPDO1_TRIGGER_DIRS_OD) pdo_config = &can.tpdo1.config;
 					else if (index == TPDO2_TRIGGER_DIRS_OD) pdo_config = &can.tpdo2.config;
 					else if (index == TPDO3_TRIGGER_DIRS_OD) pdo_config = &can.tpdo3.config;
 					else if (index == TPDO4_TRIGGER_DIRS_OD) pdo_config = &can.tpdo4.config;
+					else if (index == RPDO1_TRIGGER_DIRS_OD) pdo_config = &can.rpdo1.config;
+					else if (index == RPDO2_TRIGGER_DIRS_OD) pdo_config = &can.rpdo2.config;
+					else if (index == RPDO3_TRIGGER_DIRS_OD) pdo_config = &can.rpdo3.config;
+					else if (index == RPDO4_TRIGGER_DIRS_OD) pdo_config = &can.rpdo4.config;
 					else break;
 					if (sub_index == 0x0F){
 						// Wrong

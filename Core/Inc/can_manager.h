@@ -380,7 +380,7 @@ typedef struct {
 	int8_t cos_occured;
 	pdo_config_t config;
 	uint8_t sync_count;
-//	uint8_t triggered;
+	uint16_t target_action_value;			// This is used to set the wanted action from the rpdo, e.g. outputs
 
 }pdo_t;
 
@@ -478,7 +478,7 @@ int8_t check_rpdo_triggered_by_analog(pdo_t* rpdo,uint8_t trigger_index, uint8_t
 int8_t check_tpdo_triggered_by_analog(pdo_t* tpdo,uint8_t trigger_index, uint8_t analog_threshold_index,int16_t new_val,int16_t last_val);
 void check_all_tpdos_for_analog_trigger(pdo_t* pdo,can_t* can_ptr,ICM42670P_t *imu_ptr);
 void check_all_rpdos_for_analog_trigger(pdo_t* rpdo,can_t* can_ptr,ICM42670P_t *imu_ptr);
-void rpdo_handler(pdo_config_t *rpdo_config,uint8_t *packet);
+void rpdo_handler(pdo_t *rpdo_config,uint8_t *packet);
 void update_pdo_payload(pdo_t *pdo, uint8_t arr_index);
 void sdo_handler(uint8_t *packet,uint32_t len);
 void nmt_handler(uint8_t *packet,uint32_t len);
