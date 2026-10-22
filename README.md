@@ -3,6 +3,10 @@ This repo holds the firmware for a custom CAN input and output circuit board cen
 CAN  IO v0.2:
 ![alt text](https://github.com/jtoobias/CAN_IO/blob/main/CAN_I%3AO.jpeg?raw=true)
 
+GUI built for the interface:
+https://github.com/jtoobias/CAN_IO_GUI
+
+
 Completed:
 - Polling of IMU data is working, on new hardware (v1.0.0)
 - CAN bus is working on new hardware (v1.0.0)
